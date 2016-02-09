@@ -1,0 +1,22 @@
+%%%-------------------------------------------------------------------
+%%% @author kirill.zhiganov
+%%% @copyright (C) 2016, <COMPANY>
+%%% @doc
+%%%
+%%% @end
+%%% Created : 09. Feb 2016 14:03
+%%%-------------------------------------------------------------------
+{application, kastle, [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+    kernel,
+    stdlib
+  ]},
+  {modules, []},
+  {mod, {kastle, []}},
+  {env, [{port, 8443},
+         {listeners, 4096}
+  ]}
+]}.
