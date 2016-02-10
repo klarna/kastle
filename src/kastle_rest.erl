@@ -72,8 +72,7 @@ init([]) ->
   {ok, #state{http_listener = Listener}}.
 
 handle_call(_Request, _From, State) ->
-%%  {reply, ok, State}.
-  {noreply, State}.
+  {reply, ok, State}.
 
 handle_cast(_Request, State) ->
   {noreply, State}.
