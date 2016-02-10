@@ -69,8 +69,6 @@ init({tcp, http}, _, _) -> {upgrade, protocol, cowboy_rest}.
 rest_init(Req0, _) ->
   {Topic, Req1}    = cowboy_req:binding(?TOPIC_REQ,     Req0, ?DEFAULT_VALUE),
   {Partition, Req} = cowboy_req:binding(?PARTITION_REQ, Req1, ?DEFAULT_VALUE),
-  io:format("Topic name is ~p~n", [Topic]),
-  io:format("Partition name is ~p~n", [Partition]),
   {ok, Req, #state{topic = Topic, partition = Partition}}.
 
 -spec rest_terminate(cowboy_req:req(), #state{}) -> ok.
@@ -94,7 +92,6 @@ charsets_provided(Req, State) -> {[<<"utf-8">>], Req, State}.
   {[_], cowboy_req:req(), #state{}}.
 %%--------------------------------------------------------------------
 content_types_accepted(Req, State) ->
-  io:format("Content type provided~n"),
   {[{{<<"application">>, <<"json">>, []}, handler}], Req, State}.
 
 %%--------------------------------------------------------------------
@@ -108,9 +105,6 @@ malformed_request(Req, State) ->
 -spec handler(cowboy_req:req(), #state{}) ->
   {true | false, cowboy_req:req(), #state{}}.
 %%--------------------------------------------------------------------
-handler(Req, State = #state{topic = Topic, partition = Partition}) ->
-  io:format("Handle: Topic name is ~p~n", [Topic]),
-  io:format("Handle: Partition name is ~p~n", [Partition]),
-  Json = <<"{\"response\":\"all good\"}">>,
-  io:format("JSON: ~p~n", [Json]),
+handler(Req, State) ->
+  %%TODO: put handler's code in here
   {true, Req, State}.

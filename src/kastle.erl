@@ -23,8 +23,8 @@
 -author("kirill.zhiganov").
 
 %% API
--export([ %%start/0
-         start/2
+-export([ start/0
+        , start/2
         , stop/0
 ]).
 
@@ -33,11 +33,8 @@
 %%%===================================================================
 
 %% @doc Starts kastle service.
-%%-spec start() -> ok.
-%%start() -> application:start(?MODULE, permanent).
-
+start() -> application:start(?MODULE, permanent).
 start(normal, _) -> application:start(?MODULE, permanent).
 
 %% @doc Stops kastle service.
--spec stop() -> ok.
 stop() -> application:stop(?MODULE).
