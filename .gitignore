@@ -9,3 +9,8 @@ ebin/
 kastle.d
 kastle.plt
 kastle.iml
+.kastle.plt
+_rel/
+rel/
+relx
+relx.config

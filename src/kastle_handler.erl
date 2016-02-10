@@ -36,6 +36,10 @@
         , rest_terminate/2
         , allowed_methods/2
         %% POST
+        , charsets_provided/2
+        , content_types_accepted/2
+        , malformed_request/2
+        , handler/2
 ]).
 
 %%_* Records ===================================================================
@@ -44,8 +48,8 @@
 }).
 
 %%_* Macros ====================================================================
--define(TOPIC_REQ,     <<"topic">>).
--define(PARTITION_REQ, <<"partition">>).
+-define(TOPIC_REQ,     topic).
+-define(PARTITION_REQ, partition).
 -define(DEFAULT_VALUE, <<"undefined">>).
 
 %% =============================================================================
@@ -65,6 +69,8 @@ init({tcp, http}, _, _) -> {upgrade, protocol, cowboy_rest}.
 rest_init(Req0, _) ->
   {Topic, Req1}    = cowboy_req:binding(?TOPIC_REQ,     Req0, ?DEFAULT_VALUE),
   {Partition, Req} = cowboy_req:binding(?PARTITION_REQ, Req1, ?DEFAULT_VALUE),
+  io:format("Topic name is ~p~n", [Topic]),
+  io:format("Partition name is ~p~n", [Partition]),
   {ok, Req, #state{topic = Topic, partition = Partition}}.
 
 -spec rest_terminate(cowboy_req:req(), #state{}) -> ok.
@@ -76,3 +82,35 @@ rest_terminate(_Req, _State) ->
   {[binary()], cowboy_req:req(), #state{}}.
 allowed_methods(Req, State) ->
   {[<<"POST">>], Req, State}.
+
+%%--------------------------------------------------------------------
+-spec charsets_provided(cowboy_req:req(), #state{}) ->
+  {[binary()], cowboy_req:req(), #state{}}.
+%%--------------------------------------------------------------------
+charsets_provided(Req, State) -> {[<<"utf-8">>], Req, State}.
+
+%%--------------------------------------------------------------------
+-spec content_types_accepted(cowboy_req:req(), #state{}) ->
+  {[_], cowboy_req:req(), #state{}}.
+%%--------------------------------------------------------------------
+content_types_accepted(Req, State) ->
+  io:format("Content type provided~n"),
+  {[{{<<"application">>, <<"json">>, []}, handler}], Req, State}.
+
+%%--------------------------------------------------------------------
+-spec malformed_request(cowboy_req:req(), #state{}) ->
+  {boolean(), cowboy_req:req(), #state{}}.
+%%--------------------------------------------------------------------
+malformed_request(Req, State) ->
+  {false, Req, State}.
+
+%%--------------------------------------------------------------------
+-spec handler(cowboy_req:req(), #state{}) ->
+  {true | false, cowboy_req:req(), #state{}}.
+%%--------------------------------------------------------------------
+handler(Req, State = #state{topic = Topic, partition = Partition}) ->
+  io:format("Handle: Topic name is ~p~n", [Topic]),
+  io:format("Handle: Partition name is ~p~n", [Partition]),
+  Json = <<"{\"response\":\"all good\"}">>,
+  io:format("JSON: ~p~n", [Json]),
+  {true, Req, State}.

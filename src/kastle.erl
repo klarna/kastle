@@ -19,47 +19,25 @@
 %%% @copyright 2016 Klarna AB
 %%% @end
 %%%=============================================================================
-
--module(kastle_sup).
+-module(kastle).
 -author("kirill.zhiganov").
 
--behaviour(supervisor).
-
 %% API
--export([ start_link/0 ]).
-
-%% Supervisor callbacks
--export([ init/1 ]).
-
--define(SERVER, ?MODULE).
--define(MAX_RESTARTS, 3).
--define(MAX_SECONDS_BETWEEN_RESTARTS, 10).
--define(SHUTDOWN, 2000).
+-export([ %%start/0
+         start/2
+        , stop/0
+]).
 
 %%%===================================================================
-%%% API functions
+%%% API
 %%%===================================================================
 
-start_link() ->
-  supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+%% @doc Starts kastle service.
+%%-spec start() -> ok.
+%%start() -> application:start(?MODULE, permanent).
 
-%%%===================================================================
-%%% Supervisor callbacks
-%%%===================================================================
+start(normal, _) -> application:start(?MODULE, permanent).
 
-init([]) ->
-  RestartStrategy = one_for_one,
-
-  SupFlags = {RestartStrategy, ?MAX_RESTARTS, ?MAX_SECONDS_BETWEEN_RESTARTS},
-
-  Restart = permanent,
-  Type = worker,
-
-  AChild = {'kastle_rest', {'kastle_rest', start_link, []},
-    Restart, ?SHUTDOWN, Type, ['kastle_rest']},
-
-  {ok, {SupFlags, [AChild]}}.
-
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================
+%% @doc Stops kastle service.
+-spec stop() -> ok.
+stop() -> application:stop(?MODULE).

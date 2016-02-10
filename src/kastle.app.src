@@ -26,11 +26,17 @@
   {registered, []},
   {applications, [
     kernel,
-    stdlib
+    stdlib,
+    cowboy,
+    lager
   ]},
   {modules, []},
-  {mod, {kastle, []}},
-  {env, [{port, 8443},
-         {listeners, 4096}
+  {mod, {kastle_app, []}},
+  {env, [{port, 8080},
+         {listeners, 4096},
+         {kafka_hosts, [ <<"kafka-test-app2.devserv.cloud.internal.machines">>
+                       , <<"kafka-test-app4.devserv.cloud.internal.machines">>
+                       , <<"kafka-test-app5.devserv.cloud.internal.machines">>
+         ]}
   ]}
 ]}.
