@@ -20,21 +20,24 @@
 %%% @end
 %%%=============================================================================
 -module(kastle).
--author("kirill.zhiganov").
 
 %% API
 -export([ start/0
-        , start/2
         , stop/0
-]).
+        ]).
 
-%%%===================================================================
-%%% API
-%%%===================================================================
+%%%_* API ======================================================================
 
-%% @doc Starts kastle service.
-start() -> application:start(?MODULE, permanent).
-start(normal, _) -> application:start(?MODULE, permanent).
+%% @doc Start kastle application
+start() ->
+  application:start(?MODULE, permanent).
 
-%% @doc Stops kastle service.
-stop() -> application:stop(?MODULE).
+%% @doc Stop kastle application
+stop() ->
+  application:stop(?MODULE).
+
+%%%_* Emacs ====================================================================
+%%% Local Variables:
+%%% allout-layout: t
+%%% erlang-indent-level: 2
+%%% End:

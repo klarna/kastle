@@ -1,6 +1,6 @@
 PROJECT = kastle
 PROJECT_DESCRIPTION = Apache Kafka REST interface
-PROJECT_VERSION = 0.0.1
+PROJECT_VERSION = 1.0.0
 
 # Whitespace to be used when creating files from templates.
 SP = 2

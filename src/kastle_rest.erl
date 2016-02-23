@@ -21,7 +21,6 @@
 %%%=============================================================================
 
 -module(kastle_rest).
--author("kirill.zhiganov").
 
 -behaviour(gen_server).
 
@@ -35,7 +34,7 @@
         , handle_info/2
         , terminate/2
         , code_change/3
-]).
+        ]).
 
 %% Macros
 -define(SERVER, ?MODULE).
@@ -43,26 +42,21 @@
 %% Records
 -record(state, {http_listener :: reference()}).
 
-%%%===================================================================
-%%% API
-%%%===================================================================
+%%%_* API ======================================================================
 
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-%%%===================================================================
-%%% gen_server callbacks
-%%%===================================================================
+%%%_* gen_server callbacks =====================================================
 
 init([]) ->
-  process_flag(trap_exit, true),
   Listener = make_ref(),
   {ok, Port} = application:get_env(kastle, port),
   Host =
     { '_'
-      , [ {<<"/rest/kafka/v0/:topic">>,          [], kastle_handler, no_opts}
-      , {<<"/rest/kafka/v0/:topic/:partition">>, [], kastle_handler, no_opts}
-%%      , {<<"/health">>,                            [], kastle_ping_handler,   no_opts}
+      , [ {<<"/rest/kafka/v0/:topic">>,            [], kastle_handler, no_opts}
+        , {<<"/rest/kafka/v0/:topic/:partition">>, [], kastle_handler, no_opts}
+        %, {<<"/health">>,                          [], kastle_ping_handler, no_opts}
         ]
     },
   Transport = [{port, Port}],
@@ -87,6 +81,8 @@ terminate(_Reason, #state{http_listener = Listener}) ->
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
 
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================
+%%%_* Emacs ====================================================================
+%%% Local Variables:
+%%% allout-layout: t
+%%% erlang-indent-level: 2
+%%% End:

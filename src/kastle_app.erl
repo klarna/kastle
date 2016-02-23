@@ -21,18 +21,15 @@
 %%%=============================================================================
 
 -module(kastle_app).
--author("kirill.zhiganov").
 
 -behaviour(application).
 
-%% Application callbacks
+%% Application behaviour callbacks
 -export([ start/2
-        , stop/1]
-).
+        , stop/1
+        ]).
 
-%%%===================================================================
-%%% Application callbacks
-%%%===================================================================
+%%%_* Application behaviour callbacks ==========================================
 
 start(_StartType, _StartArgs) ->
   kastle_sup:start_link().
@@ -40,6 +37,8 @@ start(_StartType, _StartArgs) ->
 stop(_State) ->
   ok.
 
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================
+%%%_* Emacs ====================================================================
+%%% Local Variables:
+%%% allout-layout: t
+%%% erlang-indent-level: 2
+%%% End:
