@@ -54,8 +54,8 @@ init([]) ->
   {ok, Port} = application:get_env(kastle, port),
   Host =
     { '_'
-      , [ {<<"/rest/kafka/v0/:topic">>,            [], kastle_handler, no_opts}
-        , {<<"/rest/kafka/v0/:topic/:partition">>, [], kastle_handler, no_opts}
+      , [ {<<"/rest/kafka/v0/:topic/:partition">>, [], kastle_handler, no_opts}
+%%        , {<<"/rest/kafka/v0/:topic">>,            [], kastle_handler, no_opts}
         %, {<<"/health">>,                          [], kastle_ping_handler, no_opts}
         ]
     },

@@ -45,7 +45,8 @@
 %%_* Macros ====================================================================
 -define(TOPIC_REQ,     topic).
 -define(PARTITION_REQ, partition).
--define(DEFAULT_VALUE, <<"undefined">>).
+-define(DEFAULT_TOPIC, <<"undefined">>).
+-define(DEFAULT_PARTITION, <<"0">>).
 
 %%_* cowboy handler callbacks ==================================================
 
@@ -59,8 +60,8 @@ init({tcp, http}, _, _) ->
 -spec rest_init(cowboy_req:req(), _) ->
                    {ok, cowboy_req:req(), #state{}}.
 rest_init(Req0, _) ->
-  {Topic, Req1}    = cowboy_req:binding(?TOPIC_REQ,     Req0, ?DEFAULT_VALUE),
-  {Partition, Req} = cowboy_req:binding(?PARTITION_REQ, Req1, ?DEFAULT_VALUE),
+  {Topic, Req1}    = cowboy_req:binding(?TOPIC_REQ,     Req0, ?DEFAULT_TOPIC),
+  {Partition, Req} = cowboy_req:binding(?PARTITION_REQ, Req1, ?DEFAULT_PARTITION),
   {ok, Req, #state{topic = Topic, partition = Partition}}.
 
 -spec rest_terminate(cowboy_req:req(), #state{}) -> ok.
@@ -94,21 +95,24 @@ handler(Req, State = #state{topic = Topic, partition = Partition0}) ->
   %%TODO: put handler's code in here
   Partition = binary_to_integer(Partition0),
   case brod:get_producer(kastle_kafka_client, Topic, Partition) of
-    {ok, _Producer} ->
-      ok = brod:produce_sync(kastle_kafka_client, Topic, Partition, <<"Kastle">>, <<"Producing a message... test coded-in">>),
-      io:format("Produced!~n");
+    {ok, Producer} ->
+      ok = brod:produce_sync(Producer, <<"Kastle">>, <<"Producing a message... test coded-in">>),
+      io:format("Produced into ~p:~p!~n", [binary_to_list(Topic), Partition]);
     {error, {producer_not_found, _}} ->
 %%      ok = brod_client:register_producer(kastle_kafka_client, Topic, Partition),
 %%      ClientId = whereis(kastle_kafka_client),
 %%      io:format("Id of the client is: ~p~n", [ClientId]),
 %%      {ok,_} = gen_server:start(brod_producer, {kastle_kafka_client, Topic, Partition, []}, []),
-      ok = brod:start_producer(kastle_kafka_client, Topic, []),
+      ProducerConfig = [ {topic_restart_delay_seconds, 10} %% topic error
+        , {partition_restart_delay_seconds, 2} %% partition error
+        , {required_acks, -1} ],
+      ok = brod:start_producer(kastle_kafka_client, Topic, ProducerConfig),
       io:format("Producer added!~n"),
 %%      timer:sleep(500),
       {ok, Pid} = brod:get_producer(kastle_kafka_client, Topic, Partition),
       io:format("Producer's id is: ~p~n", [Pid]),
-      ok = brod:produce_sync(kastle_kafka_client, Topic, Partition, <<"Kastle">>, <<"Producing a message... test coded-in">>),
-      io:format("Produced on new topic!~n")
+      ok = brod:produce_sync(Pid, <<"Kastle">>, <<"Producing a message... test coded-in">>),
+      io:format("Produced into new topic at ~p:~p!~n", [binary_to_list(Topic), Partition])
   end,
   {true, Req, State}.
 
