@@ -40,7 +40,7 @@
 -define(SERVER, ?MODULE).
 
 %% Records
--record(state, {http_listener :: reference()}).
+-record(state, { http_listener :: reference() }).
 
 %%%_* API ======================================================================
 

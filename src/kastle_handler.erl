@@ -90,8 +90,26 @@ malformed_request(Req, State) ->
 
 -spec handler(cowboy_req:req(), #state{}) ->
                  {true | false, cowboy_req:req(), #state{}}.
-handler(Req, State) ->
+handler(Req, State = #state{topic = Topic, partition = Partition0}) ->
   %%TODO: put handler's code in here
+  Partition = binary_to_integer(Partition0),
+  case brod:get_producer(kastle_kafka_client, Topic, Partition) of
+    {ok, _Producer} ->
+      ok = brod:produce_sync(kastle_kafka_client, Topic, Partition, <<"Kastle">>, <<"Producing a message... test coded-in">>),
+      io:format("Produced!~n");
+    {error, {producer_not_found, _}} ->
+%%      ok = brod_client:register_producer(kastle_kafka_client, Topic, Partition),
+%%      ClientId = whereis(kastle_kafka_client),
+%%      io:format("Id of the client is: ~p~n", [ClientId]),
+%%      {ok,_} = gen_server:start(brod_producer, {kastle_kafka_client, Topic, Partition, []}, []),
+      ok = brod:start_producer(kastle_kafka_client, Topic, []),
+      io:format("Producer added!~n"),
+%%      timer:sleep(500),
+      {ok, Pid} = brod:get_producer(kastle_kafka_client, Topic, Partition),
+      io:format("Producer's id is: ~p~n", [Pid]),
+      ok = brod:produce_sync(kastle_kafka_client, Topic, Partition, <<"Kastle">>, <<"Producing a message... test coded-in">>),
+      io:format("Produced on new topic!~n")
+  end,
   {true, Req, State}.
 
 %%%_* Emacs ====================================================================
