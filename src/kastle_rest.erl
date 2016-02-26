@@ -52,10 +52,10 @@ start_link() ->
 %%%_* gen_server callbacks =====================================================
 
 init([]) ->
-  self() ! pos_init,
+  self() ! post_init,
   {ok, #state{}}.
 
-handle_info(pos_init, State) ->
+handle_info(post_init, State) ->
   Listener = make_ref(),
   Port = getenv(port, ?DEFAULT_PORT),
   lager:info("~p is listening on port ~p", [?APPLICATION, Port]),
