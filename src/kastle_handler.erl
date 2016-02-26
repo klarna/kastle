@@ -48,6 +48,8 @@
 -define(DEFAULT_TOPIC, <<"undefined">>).
 -define(DEFAULT_PARTITION, <<"0">>).  %% At the moment no need for default partition
                                       %% as it must be a part of path according to API
+-define(MESSAGE_KEY, <<"key">>).
+-define(MESSAGE_BODY, <<"message">>).
 
 %%_* cowboy handler callbacks ==================================================
 
@@ -103,9 +105,15 @@ handler(Req0, State0 = #state{topic = Topic, partition = Partition0}) ->
 %% === Internal functions
 %% =============================================================================
 extract_json_body(Req0, State) ->
-  {ok, _Body, Req} = cowboy_req:body(Req0),
+  {ok, Body, Req} = cowboy_req:body(Req0),
   %%TODO: put body extraction here (use some json lib...)
-  {ok, {<<"Key">>, <<"Message">>}, Req, State}.
+  io:format("body: ~p~n", [Body]),
+  {JsonBody}=jiffy:decode(Body),
+  io:format("JSON body: ~p~n", [JsonBody]),
+  {?MESSAGE_KEY, MessageKeyValue} = lists:keyfind(?MESSAGE_KEY, 1, JsonBody),
+  {?MESSAGE_BODY, MessageBodyValue} = lists:keyfind(?MESSAGE_BODY, 1, JsonBody),
+  io:format("Producing with Key: ~p and Body: ~p~n", [MessageKeyValue, MessageBodyValue]),
+  {ok, {MessageKeyValue, MessageBodyValue}, Req, State}.
 
 handle_produce(Topic, Partition, [{MessageKey, MessageBody}]) ->
   case get_producers_pid(Topic, Partition) of
