@@ -49,7 +49,7 @@
 -define(DEFAULT_PARTITION, <<"0">>).  %% At the moment no need for default partition
                                       %% as it must be a part of path according to API
 -define(MESSAGE_KEY, <<"key">>).
--define(MESSAGE_BODY, <<"message">>).
+-define(MESSAGE_VALUE, <<"value">>).
 
 %%_* cowboy handler callbacks ==================================================
 
@@ -94,35 +94,58 @@ malformed_request(Req, State) ->
 
 -spec handler(cowboy_req:req(), #state{}) ->
                  {true | false, cowboy_req:req(), #state{}}.
-handler(Req0, State0 = #state{topic = Topic, partition = Partition0}) ->
-  %%TODO: put handler's code in here
+handler(Req0, State = #state{topic = Topic, partition = Partition0}) ->
   Partition = binary_to_integer(Partition0),
-  {ok, {MessageKey, MessageBody}, Req, State} = extract_json_body(Req0, State0),
-  Result = handle_produce(Topic, Partition, [{MessageKey, MessageBody}]),
+  {Result, Req} = case extract_json_body(Req0) of
+    {ok, {MessageKey, MessageValue}, Req1} ->
+      {handle_produce(Topic, Partition, [{MessageKey, MessageValue}]), Req1};
+    {error, Req1} ->
+      {false, Req1}
+  end,
   {Result, Req, State}.
 
 %% =============================================================================
 %% === Internal functions
 %% =============================================================================
-extract_json_body(Req0, State) ->
+extract_json_body(Req0) ->
   {ok, Body, Req} = cowboy_req:body(Req0),
-  %%TODO: put body extraction here (use some json lib...)
-  io:format("body: ~p~n", [Body]),
   {JsonBody}=jiffy:decode(Body),
-  io:format("JSON body: ~p~n", [JsonBody]),
-  {?MESSAGE_KEY, MessageKeyValue} = lists:keyfind(?MESSAGE_KEY, 1, JsonBody),
-  {?MESSAGE_BODY, MessageBodyValue} = lists:keyfind(?MESSAGE_BODY, 1, JsonBody),
-  io:format("Producing with Key: ~p and Body: ~p~n", [MessageKeyValue, MessageBodyValue]),
-  {ok, {MessageKeyValue, MessageBodyValue}, Req, State}.
+  case is_valid_json_body(JsonBody) of
+    {true, {KeyValue, MessageValue}} ->
+      {ok, {KeyValue, MessageValue}, Req};
+    false ->
+      {error, Req}
+  end.
+
+is_valid_json_body(JsonBody) ->
+  check_message(get_message_key(JsonBody), get_message_value(JsonBody)).
+
+get_message_key(JsonBody) ->
+  case lists:keyfind(?MESSAGE_KEY, 1, JsonBody) of
+    {?MESSAGE_KEY, KeyValue} ->
+      KeyValue;
+    false ->
+      false
+  end.
+
+get_message_value(JsonBody) ->
+  case lists:keyfind(?MESSAGE_VALUE, 1, JsonBody) of
+    {?MESSAGE_VALUE, MessageValue} ->
+      MessageValue;
+    false ->
+      false
+  end.
+
+check_message(false, _) -> false;
+check_message(_, false) -> false;
+check_message(Key, Value) -> {true, {Key, Value}}.
 
 handle_produce(Topic, Partition, [{MessageKey, MessageBody}]) ->
   case get_producers_pid(Topic, Partition) of
     {error, no_such_producer} ->
-      io:format("There is no partition ~p for topic ~p~n", [Partition, Topic]),
       false;
     {ok, Producer} ->
       ok = brod:produce_sync(Producer, MessageKey, MessageBody),
-      io:format("Produced into ~p:~p!~n", [binary_to_list(Topic), Partition]),
       true
     end.
 
@@ -135,10 +158,8 @@ get_producers_pid(Topic, Partition) ->
         , {partition_restart_delay_seconds, 2} %% partition error
         , {required_acks, -1} ],
       ok = brod:start_producer(kastle_kafka_client, Topic, ProducerConfig),
-      io:format("Producer added!~n"),
       case brod:get_producer(kastle_kafka_client, Topic, Partition) of
         {ok, Pid} ->
-          io:format("Producer's id is: ~p~n", [Pid]),
           {ok, Pid};
         {error, {producer_not_found, Topic, Partition}} ->
           {error, no_such_producer}
