@@ -157,13 +157,20 @@ get_producers_pid(Topic, Partition) ->
       ProducerConfig = [ {topic_restart_delay_seconds, 10} %% topic error
         , {partition_restart_delay_seconds, 2} %% partition error
         , {required_acks, -1} ],
-      ok = brod:start_producer(kastle_kafka_client, Topic, ProducerConfig),
-      case brod:get_producer(kastle_kafka_client, Topic, Partition) of
-        {ok, Pid} ->
-          {ok, Pid};
-        {error, {producer_not_found, Topic, Partition}} ->
-          {error, no_such_producer}
+      case brod:start_producer(kastle_kafka_client, Topic, ProducerConfig) of
+        ok ->
+          case brod:get_producer(kastle_kafka_client, Topic, Partition) of
+            {ok, Pid} ->
+              {ok, Pid};
+            {error, {producer_down, noproc}} ->
+              {error, no_such_producer};
+            {error, {producer_not_found, Topic, Partition}} ->
+              {error, no_such_producer}
+          end;
+        {error, _} -> {error, no_such_producer}
       end;
+    {error, {producer_down, noproc}} ->
+      {error, no_such_producer};
     {error, {producer_not_found, Topic, Partition}} ->
       %% No such partition on specified topic?
       {error, no_such_producer}
