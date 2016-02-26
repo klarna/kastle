@@ -38,6 +38,8 @@
 
 %% Macros
 -define(SERVER, ?MODULE).
+-define(DEFAULT_PORT, 8092).
+-define(DEFAULT_ACCEPTORS, 2).
 
 %% Records
 -record(state, { http_listener :: reference() }).
@@ -50,8 +52,13 @@ start_link() ->
 %%%_* gen_server callbacks =====================================================
 
 init([]) ->
+  self() ! pos_init,
+  {ok, #state{}}.
+
+handle_info(pos_init, State) ->
   Listener = make_ref(),
-  {ok, Port} = application:get_env(kastle, port),
+  Port = getenv(port, ?DEFAULT_PORT),
+  lager:info("~p is listening on port ~p", [?APPLICATION, Port]),
   Host =
     { '_'
       , [ {<<"/rest/kafka/v0/:topic/:partition">>, [], kastle_handler, no_opts}
@@ -61,17 +68,16 @@ init([]) ->
     },
   Transport = [{port, Port}],
   Protocol = [{env, [{dispatch, cowboy_router:compile([Host])}]}],
-  {ok, Listeners} = application:get_env(kastle, listeners),
-  {ok, _} = cowboy:start_http(Listener, Listeners, Transport, Protocol),
-  {ok, #state{http_listener = Listener}}.
+  Acceptors = getenv(acceptors, ?DEFAULT_ACCEPTORS),
+  {ok, _} = cowboy:start_http(Listener, Acceptors, Transport, Protocol),
+  {noreply, State#state{http_listener = Listener}};
+handle_info(_Info, State) ->
+  {noreply, State}.
 
 handle_call(_Request, _From, State) ->
   {reply, ok, State}.
 
 handle_cast(_Request, State) ->
-  {noreply, State}.
-
-handle_info(_Info, State) ->
   {noreply, State}.
 
 terminate(_Reason, #state{http_listener = Listener}) ->
@@ -80,6 +86,19 @@ terminate(_Reason, #state{http_listener = Listener}) ->
 
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
+
+getenv(Name) ->
+  case application:get_env(?APPLICATION, Name) of
+    {ok, Value} -> Value;
+    undefined   -> erlang:throw({noenv, Name})
+  end.
+
+getenv(Name, Default) ->
+  try
+    getenv(Name)
+  catch throw : {noenv, Name} ->
+    Default
+  end.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
