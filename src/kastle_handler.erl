@@ -95,14 +95,18 @@ malformed_request(Req, State) ->
 -spec handler(cowboy_req:req(), #state{}) ->
                  {true | false, cowboy_req:req(), #state{}}.
 handler(Req0, State = #state{topic = Topic, partition = Partition0}) ->
-  Partition = binary_to_integer(Partition0),
-  {Result, Req} = case extract_json_body(Req0) of
-    {ok, {MessageKey, MessageValue}, Req1} ->
-      {handle_produce(Topic, Partition, [{MessageKey, MessageValue}]), Req1};
-    {error, Req1} ->
-      {false, Req1}
-  end,
-  {Result, Req, State}.
+  case string:to_integer(binary_to_list(Partition0)) of
+    {Partition, []} when is_integer(Partition) ->
+      {Result, Req} = case extract_json_body(Req0) of
+                        {ok, {MessageKey, MessageValue}, Req1} ->
+                          {handle_produce(Topic, Partition, [{MessageKey, MessageValue}]), Req1};
+                        {error, Req1} ->
+                          {false, Req1}
+                      end,
+      {Result, Req, State};
+    {error, no_integer} ->
+      {false, Req0, State}
+  end.
 
 %% =============================================================================
 %% === Internal functions
