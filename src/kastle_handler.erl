@@ -46,7 +46,8 @@
 -define(TOPIC_REQ,     topic).
 -define(PARTITION_REQ, partition).
 -define(DEFAULT_TOPIC, <<"undefined">>).
--define(DEFAULT_PARTITION, <<"0">>).
+-define(DEFAULT_PARTITION, <<"0">>).  %% At the moment no need for default partition
+                                      %% as it must be a part of path according to API
 
 %%_* cowboy handler callbacks ==================================================
 
@@ -91,30 +92,54 @@ malformed_request(Req, State) ->
 
 -spec handler(cowboy_req:req(), #state{}) ->
                  {true | false, cowboy_req:req(), #state{}}.
-handler(Req, State = #state{topic = Topic, partition = Partition0}) ->
+handler(Req0, State0 = #state{topic = Topic, partition = Partition0}) ->
   %%TODO: put handler's code in here
   Partition = binary_to_integer(Partition0),
+  {ok, {MessageKey, MessageBody}, Req, State} = extract_json_body(Req0, State0),
+  Result = handle_produce(Topic, Partition, [{MessageKey, MessageBody}]),
+  {Result, Req, State}.
+
+%% =============================================================================
+%% === Internal functions
+%% =============================================================================
+extract_json_body(Req0, State) ->
+  {ok, _Body, Req} = cowboy_req:body(Req0),
+  %%TODO: put body extraction here (use some json lib...)
+  {ok, {<<"Key">>, <<"Message">>}, Req, State}.
+
+handle_produce(Topic, Partition, [{MessageKey, MessageBody}]) ->
+  case get_producers_pid(Topic, Partition) of
+    {error, no_such_producer} ->
+      io:format("There is no partition ~p for topic ~p~n", [Partition, Topic]),
+      false;
+    {ok, Producer} ->
+      ok = brod:produce_sync(Producer, MessageKey, MessageBody),
+      io:format("Produced into ~p:~p!~n", [binary_to_list(Topic), Partition]),
+      true
+    end.
+
+get_producers_pid(Topic, Partition) ->
   case brod:get_producer(kastle_kafka_client, Topic, Partition) of
     {ok, Producer} ->
-      ok = brod:produce_sync(Producer, <<"Kastle">>, <<"Producing a message... test coded-in">>),
-      io:format("Produced into ~p:~p!~n", [binary_to_list(Topic), Partition]);
-    {error, {producer_not_found, _}} ->
-%%      ok = brod_client:register_producer(kastle_kafka_client, Topic, Partition),
-%%      ClientId = whereis(kastle_kafka_client),
-%%      io:format("Id of the client is: ~p~n", [ClientId]),
-%%      {ok,_} = gen_server:start(brod_producer, {kastle_kafka_client, Topic, Partition, []}, []),
+      {ok, Producer};
+    {error, {producer_not_found, Topic}} ->
       ProducerConfig = [ {topic_restart_delay_seconds, 10} %% topic error
         , {partition_restart_delay_seconds, 2} %% partition error
         , {required_acks, -1} ],
       ok = brod:start_producer(kastle_kafka_client, Topic, ProducerConfig),
       io:format("Producer added!~n"),
-%%      timer:sleep(500),
-      {ok, Pid} = brod:get_producer(kastle_kafka_client, Topic, Partition),
-      io:format("Producer's id is: ~p~n", [Pid]),
-      ok = brod:produce_sync(Pid, <<"Kastle">>, <<"Producing a message... test coded-in">>),
-      io:format("Produced into new topic at ~p:~p!~n", [binary_to_list(Topic), Partition])
-  end,
-  {true, Req, State}.
+      case brod:get_producer(kastle_kafka_client, Topic, Partition) of
+        {ok, Pid} ->
+          io:format("Producer's id is: ~p~n", [Pid]),
+          {ok, Pid};
+        {error, {producer_not_found, Topic, Partition}} ->
+          {error, no_such_producer}
+      end;
+    {error, {producer_not_found, Topic, Partition}} ->
+      %% No such partition on specified topic?
+      {error, no_such_producer}
+  end.
+
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
