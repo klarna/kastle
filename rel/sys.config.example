@@ -1,9 +1,13 @@
 %% -*- mode: Erlang; fill-column: 80; -*-
 [ { lager,
-   [ { log_root, "/var/log/kastle" }
-   , { crash_log, "crash.log" }
+   [ { crash_log, "crash.log" }
    , { handlers
-     , [ { lager_file_backend, [ {file, "error.log"},  {level, error}]}
+     , [ { lager_console_backend
+         , [ info
+           , {lager_default_formatter, [date, " ", time, " [",severity,"] ", module, "(", pid, "): ", message, "\n"]}
+           ]
+         }
+       , { lager_file_backend, [ {file, "error.log"},  {level, error}]}
        , { lager_file_backend, [ {file, "warn.log"},   {level, warning}]}
        , { lager_file_backend, [ {file, "info.log"},   {level, info}]}
        %% This backend should only be used for development,

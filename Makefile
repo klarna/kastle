@@ -10,7 +10,7 @@ dep_brod = git https://github.com/klarna/brod.git add-api-to-start-producer-on-d
 include erlang.mk
 
 # Compile flags
-ERLC_COMPILE_OPTS = +'{parse_transform, lager_transform}'
+ERLC_COMPILE_OPTS = +'{parse_transform, lager_transform}' -DAPPLICATION=kastle
 
 # Append these settings
 ERLC_OPTS += $(ERLC_COMPILE_OPTS)
