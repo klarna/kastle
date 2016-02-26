@@ -27,13 +27,10 @@
   {applications, [
     kernel,
     stdlib,
-    cowboy,
-    lager
+    lager,
+    cowboy
   ]},
   {modules, []},
   {mod, {kastle_app, []}},
-  {env, [{port, 8080},
-         {listeners, 4096},
-         {kafka_hosts, [ {<<"host_placeholder">>, <<"port_placeholder">>} ]}
-  ]}
+  {env, []}
 ]}.
