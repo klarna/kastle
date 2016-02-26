@@ -10,5 +10,6 @@ kastle.d
 kastle.plt
 kastle.iml
 .kastle.plt
+rel/sys.config
 _rel/
 relx
