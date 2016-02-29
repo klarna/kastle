@@ -113,13 +113,17 @@ handler(Req0, State = #state{topic = Topic, partition = Partition0}) ->
 %% =============================================================================
 extract_json_body(Req0) ->
   {ok, Body, Req} = cowboy_req:body(Req0),
-  {JsonBody}=jiffy:decode(Body),
-  case is_valid_json_body(JsonBody) of
-    {true, {KeyValue, MessageValue}} ->
-      {ok, {KeyValue, MessageValue}, Req};
-    false ->
+  case catch jiffy:decode(Body) of
+    {JsonBody} ->
+      case is_valid_json_body(JsonBody) of
+        {true, {KeyValue, MessageValue}} ->
+          {ok, {KeyValue, MessageValue}, Req};
+        false ->
+          {error, Req}
+      end;
+    {error, _} ->
       {error, Req}
-  end.
+end.
 
 is_valid_json_body(JsonBody) ->
   check_message(get_message_key(JsonBody), get_message_value(JsonBody)).

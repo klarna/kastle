@@ -28,7 +28,8 @@
     kernel,
     stdlib,
     lager,
-    cowboy
+    cowboy,
+    brod
   ]},
   {modules, []},
   {mod, {kastle_app, []}},
