@@ -24,6 +24,9 @@
 %% API
 -export([ start/0
         , stop/0
+        , getenv/1
+        , getenv/2
+        , get_producer_config/0
         ]).
 
 %%%_* API ======================================================================
@@ -35,6 +38,22 @@ start() ->
 %% @doc Stop kastle application
 stop() ->
   application:stop(?MODULE).
+
+getenv(Name) ->
+  case application:get_env(?APPLICATION, Name) of
+    {ok, Value} -> Value;
+    undefined   -> erlang:throw({noenv, Name})
+  end.
+
+getenv(Name, Default) ->
+  try
+    getenv(Name)
+  catch throw : {noenv, Name} ->
+    Default
+  end.
+
+get_producer_config() ->
+  getenv(producer_config, []).
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

@@ -24,6 +24,8 @@
 
 -behaviour(gen_server).
 
+%%_* Exports ===================================================================
+
 %% API
 -export([ start_link/0 ]).
 
@@ -36,13 +38,16 @@
         , code_change/3
         ]).
 
-%% Macros
+%%_* Includes ==================================================================
+-include("kastle.hrl").
+
+%%_* Records ===================================================================
+-record(state, { http_listener :: reference() }).
+
+%%_* Macros ====================================================================
 -define(SERVER, ?MODULE).
 -define(DEFAULT_PORT, 8092).
 -define(DEFAULT_ACCEPTORS, 2).
-
-%% Records
--record(state, { http_listener :: reference() }).
 
 %%%_* API ======================================================================
 
@@ -52,32 +57,35 @@ start_link() ->
 %%%_* gen_server callbacks =====================================================
 
 init([]) ->
-  self() ! post_init,
-  {ok, #state{}}.
-
-handle_info(post_init, State) ->
+  Schema = #{<<"type">> => <<"object">>,
+             <<"properties">> =>
+               #{?MESSAGE_KEY => #{ <<"type">> => <<"binary">>,
+                                    <<"required">> => true},
+                 ?MESSAGE_VALUE => #{<<"type">> => <<"binary">>,
+                                     <<"required">> => true}}},
+  jesse:add_schema(?KASTLE_JSON_SCHEMA, Schema),
   Listener = make_ref(),
-  Port = getenv(port, ?DEFAULT_PORT),
+  Port = kastle:getenv(port, ?DEFAULT_PORT),
   lager:info("~p is listening on port ~p", [?APPLICATION, Port]),
   Host =
     { '_'
       , [ {<<"/rest/kafka/v0/:topic/:partition">>, [], kastle_handler, no_opts}
-%%        , {<<"/rest/kafka/v0/:topic">>,            [], kastle_handler, no_opts}
-        %, {<<"/health">>,                          [], kastle_ping_handler, no_opts}
+        %, {<<"/ping">>,                            [], kastle_ping_handler, no_opts}
         ]
     },
   Transport = [{port, Port}],
   Protocol = [{env, [{dispatch, cowboy_router:compile([Host])}]}],
-  Acceptors = getenv(acceptors, ?DEFAULT_ACCEPTORS),
+  Acceptors = kastle:getenv(acceptors, ?DEFAULT_ACCEPTORS),
   {ok, _} = cowboy:start_http(Listener, Acceptors, Transport, Protocol),
-  {noreply, State#state{http_listener = Listener}};
-handle_info(_Info, State) ->
-  {noreply, State}.
+  {ok, #state{http_listener = Listener}}.
 
 handle_call(_Request, _From, State) ->
   {reply, ok, State}.
 
 handle_cast(_Request, State) ->
+  {noreply, State}.
+
+handle_info(_Info, State) ->
   {noreply, State}.
 
 terminate(_Reason, #state{http_listener = Listener}) ->
@@ -87,18 +95,7 @@ terminate(_Reason, #state{http_listener = Listener}) ->
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
 
-getenv(Name) ->
-  case application:get_env(?APPLICATION, Name) of
-    {ok, Value} -> Value;
-    undefined   -> erlang:throw({noenv, Name})
-  end.
-
-getenv(Name, Default) ->
-  try
-    getenv(Name)
-  catch throw : {noenv, Name} ->
-    Default
-  end.
+%%_* Internal functions ========================================================
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
