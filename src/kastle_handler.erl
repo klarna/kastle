@@ -95,18 +95,8 @@ malformed_request(Req, State) ->
 -spec handler(cowboy_req:req(), #state{}) ->
                  {true | false, cowboy_req:req(), #state{}}.
 handler(Req0, State = #state{topic = Topic, partition = Partition0}) ->
-  case string:to_integer(binary_to_list(Partition0)) of
-    {Partition, []} when is_integer(Partition) ->
-      {Result, Req} = case extract_json_body(Req0) of
-                        {ok, {MessageKey, MessageValue}, Req1} ->
-                          {handle_produce(Topic, Partition, [{MessageKey, MessageValue}]), Req1};
-                        {error, Req1} ->
-                          {false, Req1}
-                      end,
-      {Result, Req, State};
-    {error, no_integer} ->
-      {false, Req0, State}
-  end.
+  {Result, Req} = do_handle(Topic, string:to_integer(binary_to_list(Partition0)), extract_json_body(Req0)),
+  {Result, Req, State}.
 
 %% =============================================================================
 %% === Internal functions
@@ -115,75 +105,63 @@ extract_json_body(Req0) ->
   {ok, Body, Req} = cowboy_req:body(Req0),
   case catch jiffy:decode(Body) of
     {JsonBody} ->
-      case is_valid_json_body(JsonBody) of
-        {true, {KeyValue, MessageValue}} ->
-          {ok, {KeyValue, MessageValue}, Req};
-        false ->
-          {error, Req}
-      end;
+      validate_json(is_valid_json_body(JsonBody), Req);
     {error, _} ->
       {error, Req}
 end.
+
+do_handle(_Topic, _Partition, {error, Req}) -> {false, Req};
+do_handle(_Topic, {error, no_integer}, {ok, {_Key, _Message}, Req}) -> {false, Req};
+do_handle(Topic, {Partition, []}, {ok, {Key, Message}, Req}) when is_integer(Partition) ->
+  {handle_produce(Topic, Partition, [{Key, Message}]), Req}.
+
+validate_json({true, {Key, Message}}, Req) -> {ok, {Key, Message}, Req};
+validate_json(false, Req) -> {error, Req}.
 
 is_valid_json_body(JsonBody) ->
   check_message(get_message_key(JsonBody), get_message_value(JsonBody)).
 
 get_message_key(JsonBody) ->
-  case lists:keyfind(?MESSAGE_KEY, 1, JsonBody) of
-    {?MESSAGE_KEY, KeyValue} ->
-      KeyValue;
-    false ->
-      false
-  end.
+  get_value(lists:keyfind(?MESSAGE_KEY, 1, JsonBody)).
 
 get_message_value(JsonBody) ->
-  case lists:keyfind(?MESSAGE_VALUE, 1, JsonBody) of
-    {?MESSAGE_VALUE, MessageValue} ->
-      MessageValue;
-    false ->
-      false
-  end.
+  get_value(lists:keyfind(?MESSAGE_VALUE, 1, JsonBody)).
+
+get_value({?MESSAGE_KEY, KeyValue}) -> KeyValue;
+get_value({?MESSAGE_VALUE, MessageValue}) -> MessageValue;
+get_value(false) -> false.
 
 check_message(false, _) -> false;
 check_message(_, false) -> false;
 check_message(Key, Value) -> {true, {Key, Value}}.
 
-handle_produce(Topic, Partition, [{MessageKey, MessageBody}]) ->
-  case get_producers_pid(Topic, Partition) of
-    {error, no_such_producer} ->
-      false;
-    {ok, Producer} ->
-      ok = brod:produce_sync(Producer, MessageKey, MessageBody),
-      true
-    end.
+handle_produce(Topic, Partition, [{MessageKey, MessageValue}]) ->
+  do_handle_produce(get_producers_pid(Topic, Partition), MessageKey, MessageValue).
+
+do_handle_produce({error, no_such_producer}, _Key, _Value) -> false;
+do_handle_produce({ok, Producer}, Key, Value) when is_pid(Producer) ->
+  do_produce_sync(brod:produce_sync(Producer, Key, Value)).
+
+do_produce_sync(ok) -> true;
+do_produce_sync({error, _}) -> false. %% TODO: handle it differently from 400 code
 
 get_producers_pid(Topic, Partition) ->
-  case brod:get_producer(kastle_kafka_client, Topic, Partition) of
-    {ok, Producer} ->
-      {ok, Producer};
-    {error, {producer_not_found, Topic}} ->
-      ProducerConfig = [ {topic_restart_delay_seconds, 10} %% topic error
-        , {partition_restart_delay_seconds, 2} %% partition error
-        , {required_acks, -1} ],
-      case brod:start_producer(kastle_kafka_client, Topic, ProducerConfig) of
-        ok ->
-          case brod:get_producer(kastle_kafka_client, Topic, Partition) of
-            {ok, Pid} ->
-              {ok, Pid};
-            {error, {producer_down, noproc}} ->
-              {error, no_such_producer};
-            {error, {producer_not_found, Topic, Partition}} ->
-              {error, no_such_producer}
-          end;
-        {error, _} -> {error, no_such_producer}
-      end;
-    {error, {producer_down, noproc}} ->
-      {error, no_such_producer};
-    {error, {producer_not_found, Topic, Partition}} ->
-      %% No such partition on specified topic?
-      {error, no_such_producer}
-  end.
+  do_get_producer(brod:get_producer(kastle_kafka_client, Topic, Partition), Partition).
 
+do_get_producer({ok, Producer}, _Partition) when is_pid(Producer) -> {ok, Producer};
+do_get_producer({error, {producer_down, noproc}}, _Partition) -> {error, no_such_producer};
+do_get_producer({error, {producer_not_found, _Topic, _Partition}}, _Partition) -> {error, no_such_producer};
+do_get_producer({error, {producer_not_found, Topic}}, Partition) ->
+  ProducerConfig = [ {topic_restart_delay_seconds, 10} %% topic error
+                   , {partition_restart_delay_seconds, 2} %% partition error
+                   , {required_acks, -1} ],
+  do_start_producer(brod:start_producer(kastle_kafka_client, Topic, ProducerConfig), Topic, Partition).
+
+do_get_producer2({ok, Producer}) when is_pid(Producer) -> {ok, Producer};
+do_get_producer2({error, _Whatever}) -> {error, no_such_producer}.
+
+do_start_producer(ok, Topic, Partition) -> do_get_producer2(brod:get_producer(kastle_kafka_client, Topic, Partition));
+do_start_producer({error, _}, _Topic, _Partition) -> {error, no_such_producer}.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
