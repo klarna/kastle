@@ -98,7 +98,9 @@ malformed_request(Req, State) ->
 -spec handler(cowboy_req:req(), #state{}) ->
                  {true | false, cowboy_req:req(), #state{}}.
 handler(Req0, State = #state{topic = Topic, partition = Partition0}) ->
-  {Result, Req} = do_handle(Topic, string:to_integer(binary_to_list(Partition0)), extract_json_body(Req0)),
+  PartitionResult = string:to_integer(binary_to_list(Partition0)),
+  JsonBodyResult = extract_json_body(Req0),
+  {Result, Req} = do_handle(Topic, PartitionResult, JsonBodyResult),
   {Result, Req, State}.
 
 %% =============================================================================
