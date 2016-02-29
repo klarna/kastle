@@ -16,3 +16,7 @@ ERLC_COMPILE_OPTS = +'{parse_transform, lager_transform}' -DAPPLICATION=kastle
 ERLC_OPTS += $(ERLC_COMPILE_OPTS)
 TEST_ERLC_OPTS += $(ERLC_COMPILE_OPTS)
 
+daemon: rel
+	./_rel/kastle_release/bin/kastle_release stop
+	./_rel/kastle_release/bin/kastle_release start
+
