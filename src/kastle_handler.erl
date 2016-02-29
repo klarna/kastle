@@ -48,6 +48,9 @@
 -define(DEFAULT_TOPIC, <<"undefined">>).
 -define(DEFAULT_PARTITION, <<"0">>).  %% At the moment no need for default partition
                                       %% as it must be a part of path according to API
+-define(DEFAULT_TOPIC_RESTART_DELAY, 10).
+-define(DEFAULT_PARTITION_RESTART_DELAY, 2).
+-define(DEFAULT_REQUIRED_ACKS, -1).
 -define(MESSAGE_KEY, <<"key">>).
 -define(MESSAGE_VALUE, <<"value">>).
 
@@ -69,7 +72,7 @@ rest_init(Req0, _) ->
 
 -spec rest_terminate(cowboy_req:req(), #state{}) -> ok.
 rest_terminate(_Req, _State) ->
-  %% We might need to add some logging here
+  %% TODO: We might need to add some logging here
   ok.
 
 -spec allowed_methods(cowboy_req:req(), #state{}) ->
@@ -150,9 +153,9 @@ do_get_producer({ok, Producer}, _Partition) when is_pid(Producer) -> {ok, Produc
 do_get_producer({error, {producer_down, noproc}}, _Partition) -> {error, no_such_producer};
 do_get_producer({error, {producer_not_found, _Topic, _Partition}}, _Partition) -> {error, no_such_producer};
 do_get_producer({error, {producer_not_found, Topic}}, Partition) ->
-  ProducerConfig = [ {topic_restart_delay_seconds, 10} %% topic error
-                   , {partition_restart_delay_seconds, 2} %% partition error
-                   , {required_acks, -1} ],
+  ProducerConfig = [ {topic_restart_delay_seconds, ?DEFAULT_TOPIC_RESTART_DELAY} %% topic error
+                   , {partition_restart_delay_seconds, ?DEFAULT_PARTITION_RESTART_DELAY} %% partition error
+                   , {required_acks, ?DEFAULT_REQUIRED_ACKS} ],
   do_start_producer(brod:start_producer(kastle_kafka_client, Topic, ProducerConfig), Topic, Partition).
 
 do_get_producer2({ok, Producer}) when is_pid(Producer) -> {ok, Producer};
