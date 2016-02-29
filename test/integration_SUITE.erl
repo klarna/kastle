@@ -59,7 +59,9 @@
 
 suite() -> [{timetrap, {seconds, 30}}].
 
-init_per_suite(Config) -> Config.
+init_per_suite(Config) ->
+  inets:start(),
+  Config.
 
 end_per_suite(_Config) -> ok.
 
@@ -89,7 +91,37 @@ all() -> [F || {F, _A} <- module_info(exports),
 %%%_* Test functions ===========================================================
 
 t_produce_to_partition_1(Config) when is_list(Config) ->
+  Method = post,
+  URL = "http://localhost:8092/rest/kafka/v0/kastle-3-2/0",
+  Header = [],
+  Type = "application/json",
+  Body = make_unique_message_body(),
+  HTTPOptions = [],
+  Options = [],
+  R = httpc:request(Method, {URL, Header, Type, Body}, HTTPOptions, Options),
+  {ok, {{"HTTP/1.1", ReturnCode, _State}, _Head, _Body}} = R,
+  ?assert(ReturnCode >= 200 andalso ReturnCode < 300),
   ok.
+
+%%%_* Help functions ===========================================================
+
+make_unique_message_body() ->
+  {K, V} = make_unique_kv(),
+  jiffy:encode({[{key, K}, {value, V}]}).
+
+%% os:timestamp should be unique enough for testing
+make_unique_kv() ->
+  { iolist_to_binary(["key-", make_ts_str()])
+  , iolist_to_binary(["val-", make_ts_str()])
+  }.
+
+make_ts_str() ->
+  Ts = os:timestamp(),
+  {{Y,M,D}, {H,Min,Sec}} = calendar:now_to_universal_time(Ts),
+  {_, _, Micro} = Ts,
+  S = io_lib:format("~4.4.0w-~2.2.0w-~2.2.0w:~2.2.0w:~2.2.0w:~2.2.0w.~6.6.0w",
+                    [Y, M, D, H, Min, Sec, Micro]),
+  lists:flatten(S).
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
