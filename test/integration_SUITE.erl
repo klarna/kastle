@@ -39,22 +39,6 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--define(HOST, "localhost").
--define(PORT, 9092).
--define(HOSTS, [{?HOST, ?PORT}]).
--define(TOPIC, <<"brod-client-SUITE-topic">>).
-
--define(WAIT(PATTERN, RESULT, TIMEOUT),
-        fun() ->
-          receive
-            PATTERN ->
-              RESULT
-          after TIMEOUT ->
-            ct:pal("timeout ~p ~p ~p", [?MODULE, ?LINE, TIMEOUT]),
-            ct:fail(timeout)
-          end
-        end()).
-
 %%%_* ct callbacks =============================================================
 
 suite() -> [{timetrap, {seconds, 30}}].
