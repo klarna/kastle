@@ -30,7 +30,9 @@
 %% cowboy rest callbacks
 -export([ rest_init/2
         , allowed_methods/2
+        , charsets_provided/2
         , content_types_accepted/2
+        , content_types_provided/2
         , handle_post/2
         ]).
 
@@ -62,10 +64,21 @@ rest_init(Req, _) ->
 allowed_methods(Req, State) ->
   {[<<"POST">>], Req, State}.
 
+-spec charsets_provided(cowboy_req:req(), #state{}) ->
+                           {[binary()], cowboy_req:req(), #state{}}.
+charsets_provided(Req, State) ->
+  {[<<"utf-8">>], Req, State}.
+
 -spec content_types_accepted(cowboy_req:req(), #state{}) ->
                                 {[_], cowboy_req:req(), #state{}}.
 content_types_accepted(Req, State) ->
   {[{{<<"application">>, <<"json">>, []}, handle_post}], Req, State}.
+
+-spec content_types_provided(cowboy_req:req(), #state{}) ->
+                                {[_], cowboy_req:req(), #state{}}.
+content_types_provided(Req, State) ->
+  %% callback will be called for GET and HEAD only
+  {[{{<<"application">>, <<"json">>, []}, none}], Req, State}.
 
 -spec handle_post(cowboy_req:req(), #state{}) ->
                      {halt, cowboy_req:req(), #state{}}.
