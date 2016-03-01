@@ -16,3 +16,11 @@ ERLC_COMPILE_OPTS = +'{parse_transform, lager_transform}' -DAPPLICATION=kastle
 ERLC_OPTS += $(ERLC_COMPILE_OPTS)
 TEST_ERLC_OPTS += $(ERLC_COMPILE_OPTS)
 
+.PHONY: test-env t
+
+test-env: rel
+	./scripts/setup-test-env.sh
+
+t: test-env ct
+	$(verbose) :
+

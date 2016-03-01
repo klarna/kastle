@@ -1,6 +1,7 @@
 %% -*- mode: Erlang; fill-column: 80; -*-
 [ { lager,
-   [ { crash_log, "crash.log" }
+   [ { log_root, "log" }
+   , { crash_log, "crash.log" }
    , { handlers
      , [ { lager_console_backend
          , [ info
