@@ -78,17 +78,39 @@ handle_post(Req0, State) ->
                         validate_partition(Partition),
                         validate_body(Body)) of
       ok ->
+        log_info(Req3, 204),
         cowboy_req:reply(204, Req3);
       {error, Error} ->
+        log_error(Req3, 400, Error),
         cowboy_req:reply(400, [], jiffy:encode(#{error => Error}), Req3);
       {error, Code, Error} ->
-        cowboy_req:reply(Code, [], jiffy:encode(#{error => Error}), Req3);
-      {jesse_error, Error} ->
-        cowboy_req:reply(400, [], Error, Req3)
+        log_error(Req3, Code, Error),
+        cowboy_req:reply(Code, [], jiffy:encode(#{error => Error}), Req3)
     end,
   {halt, Req, State}.
 
 %%_* Internal functions ========================================================
+log_error(Req, ResponseCode, Error) ->
+  do_log(error, Req, ResponseCode, ", error: ~p", [Error]).
+
+log_info(Req, ResponseCode) ->
+  do_log(info, Req, ResponseCode).
+
+do_log(Level, Req, ResponseCode) ->
+  do_log(Level, Req, ResponseCode, "", []).
+
+do_log(Level, Req, ResponseCode, ExtraFmt, ExtraArgs) ->
+  {Method, _} = cowboy_req:method(Req),
+  {Path, _} = cowboy_req:path(Req),
+  {Version, _} = cowboy_req:version(Req),
+  {UserAgent, _} = cowboy_req:header(<<"user-agent">>, Req),
+  {Host, _} = cowboy_req:header(<<"host">>, Req),
+  {ContentType, _} = cowboy_req:header(<<"content-type">>, Req),
+  {ContentLength, _} = cowboy_req:header(<<"content-length">>, Req),
+  Format = "~s ~s ~s ~B, user-agent: ~s, host: ~s, content-type: ~s, content-length: ~s" ++ ExtraFmt,
+  Args = [Method, Path, Version, ResponseCode, UserAgent, Host, ContentType, ContentLength] ++ ExtraArgs,
+  lager:log(Level, self(), Format, Args).
+
 validate_partition(Partition) ->
   string:to_integer(binary_to_list(Partition)).
 
@@ -101,13 +123,23 @@ do_validate_body(Data) ->
   case jesse:validate(?KASTLE_JSON_SCHEMA, Data) of
     {ok, _} = Res ->
       Res;
-    {error, _} = Error ->
-      {jesse_error, jesse_error:to_json(Error)}
+    {error, JesseErrors} ->
+      parse_jesse_errors(JesseErrors)
   end.
+
+parse_jesse_errors([{data_invalid, _Schema, ErrorType, _Value, _Path}]) ->
+  ErrorMsg = iolist_to_binary(io_lib:format("json schema validation failed: ~p", [ErrorType])),
+  {error, ErrorMsg};
+parse_jesse_errors([{schema_invalid, Schema, ErrorType}]) ->
+  lager:error("Invalid schema: ~p, ~p", [Schema, ErrorType]),
+  {error, 500, <<"error validating json, please contact service maintainers">>};
+parse_jesse_errors(Other) ->
+  lager:error("Unexpected jesse error(s): ~p", [Other]),
+  {error, 500, <<"error validating json, please contact service maintainers">>}.
 
 do_handle_post(_Topic, _Partition, {error, _Any} = Error) ->
   Error;
-do_handle_post(_Topic, _Partition, {jesse_error, _Any} = Error) ->
+do_handle_post(_Topic, _Partition, {error, _Code, _Any} = Error) ->
   Error;
 do_handle_post(_Topic, {error, no_integer}, _Data) ->
   {error, <<"invalid partition">>};
@@ -125,7 +157,7 @@ produce(Topic, Partition, [{Key, Value}]) ->
     {error, {producer_not_found, _Topic, _Partition}} ->
       {error, 404, <<"partition not found">>};
     {error, _} -> % client_down or producer_down
-      {error, 500, <<"infrastructure down">>};
+      {error, 503, <<"infrastructure down">>};
     {ok, Producer} ->
       brod:produce_sync(Producer, Key, Value)
   end.
