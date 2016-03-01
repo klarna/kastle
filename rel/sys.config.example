@@ -33,4 +33,6 @@
       ]
      }
    ]}
+, { kastle, [ {port, 8092}
+            , {listeners, 4}]}
 ].
