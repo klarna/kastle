@@ -33,7 +33,8 @@
         , charsets_provided/2
         , content_types_accepted/2
         , content_types_provided/2
-        , handle_post/2
+        , handle_json/2
+        , handle_binary/2
         ]).
 
 %%_* Includes ==================================================================
@@ -45,6 +46,8 @@
 %%_* Macros ====================================================================
 -define(TOPIC_REQ,     topic).
 -define(PARTITION_REQ, partition).
+
+-define(KAFKA_KEY_HEADER, <<"kafka-key">>).
 
 %%_* cowboy handler callbacks ==================================================
 
@@ -72,7 +75,8 @@ charsets_provided(Req, State) ->
 -spec content_types_accepted(cowboy_req:req(), #state{}) ->
                                 {[_], cowboy_req:req(), #state{}}.
 content_types_accepted(Req, State) ->
-  {[{{<<"application">>, <<"json">>, []}, handle_post}], Req, State}.
+  {[ {{<<"application">>, <<"json">>, []}, handle_json}
+   , {{<<"application">>, <<"binary">>, []}, handle_binary}], Req, State}.
 
 -spec content_types_provided(cowboy_req:req(), #state{}) ->
                                 {[_], cowboy_req:req(), #state{}}.
@@ -80,14 +84,14 @@ content_types_provided(Req, State) ->
   %% callback will be called for GET and HEAD only
   {[{{<<"application">>, <<"json">>, []}, none}], Req, State}.
 
--spec handle_post(cowboy_req:req(), #state{}) ->
+-spec handle_json(cowboy_req:req(), #state{}) ->
                      {halt, cowboy_req:req(), #state{}}.
-handle_post(Req0, State) ->
+handle_json(Req0, State) ->
   {Topic, Req1} = cowboy_req:binding(?TOPIC_REQ, Req0),
   {Partition, Req2} = cowboy_req:binding(?PARTITION_REQ, Req1),
   {ok, Body, Req3} = cowboy_req:body(Req2),
   {ok, Req} =
-    case do_handle_post(Topic,
+    case do_handle_json(Topic,
                         validate_partition(Partition),
                         validate_body(Body)) of
       ok ->
@@ -99,6 +103,27 @@ handle_post(Req0, State) ->
       {error, Code, Error} ->
         log_error(Req3, Code, Error),
         cowboy_req:reply(Code, [], jiffy:encode(#{error => Error}), Req3)
+    end,
+  {halt, Req, State}.
+
+-spec handle_binary(cowboy_req:req(), #state{}) ->
+                       {halt, cowboy_req:req(), #state{}}.
+handle_binary(Req0, State) ->
+  {Topic, Req1} = cowboy_req:binding(?TOPIC_REQ, Req0),
+  {Partition, Req2} = cowboy_req:binding(?PARTITION_REQ, Req1),
+  {Key, Req3} = cowboy_req:header(?KAFKA_KEY_HEADER, Req2, <<>>),
+  {ok, Value, Req4} = cowboy_req:body(Req3),
+  {ok, Req} =
+    case do_handle_binary(Topic, validate_partition(Partition), Key, Value) of
+      ok ->
+        log_info(Req4, 204),
+        cowboy_req:reply(204, Req4);
+      {error, Error} ->
+        log_error(Req4, 400, Error),
+        cowboy_req:reply(400, [], jiffy:encode(#{error => Error}), Req4);
+      {error, Code, Error} ->
+        log_error(Req4, Code, Error),
+        cowboy_req:reply(Code, [], jiffy:encode(#{error => Error}), Req4)
     end,
   {halt, Req, State}.
 
@@ -150,15 +175,20 @@ parse_jesse_errors(Other) ->
   lager:error("Unexpected jesse error(s): ~p", [Other]),
   {error, 500, <<"error validating json, please contact service maintainers">>}.
 
-do_handle_post(_Topic, _Partition, {error, _Any} = Error) ->
+do_handle_json(_Topic, _Partition, {error, _Any} = Error) ->
   Error;
-do_handle_post(_Topic, _Partition, {error, _Code, _Any} = Error) ->
+do_handle_json(_Topic, _Partition, {error, _Code, _Any} = Error) ->
   Error;
-do_handle_post(_Topic, {error, no_integer}, _Data) ->
+do_handle_json(_Topic, {error, no_integer}, _Data) ->
   {error, <<"invalid partition">>};
-do_handle_post(Topic, {Partition, []}, {ok, Data}) when is_integer(Partition) ->
+do_handle_json(Topic, {Partition, []}, {ok, Data}) when is_integer(Partition) ->
   Key = maps:get(?MESSAGE_KEY, Data),
   Value = maps:get(?MESSAGE_VALUE, Data),
+  produce(Topic, Partition, [{Key, Value}]).
+
+do_handle_binary(_Topic, {error, no_integer}, _Key, _Value) ->
+  {error, <<"invalid partition">>};
+do_handle_binary(Topic, {Partition, []}, Key, Value) when is_integer(Partition) ->
   produce(Topic, Partition, [{Key, Value}]).
 
 produce(Topic, Partition, [{Key, Value}]) ->
