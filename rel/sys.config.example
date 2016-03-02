@@ -19,15 +19,20 @@
    ]}
 , { brod,
    [ { clients,
-      [ { kastle_kafka_client %% registered name
+      [ { kastle_kafka_client %% registered name, don't change - hard coded in src/kastle.hrl
         , [ { endpoints, [ {"localhost", 9092}
                          ]}
           , { config
             , [ {restart_delay_seconds, 10} ] %% connection error
             }
+          , { producer_config, [ {topic_restart_delay_seconds, 10}
+                               , {partition_restart_delay_seconds, 2}
+                               , {required_acks, -1}]}
           ]
         }
       ]
      }
    ]}
+, { kastle, [ {port, 8092}
+            , {listeners, 4}]}
 ].

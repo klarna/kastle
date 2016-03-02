@@ -29,30 +29,22 @@
 
 %% cowboy rest callbacks
 -export([ rest_init/2
-        , rest_terminate/2
         , allowed_methods/2
         , charsets_provided/2
         , content_types_accepted/2
-        , malformed_request/2
-        , handler/2
+        , content_types_provided/2
+        , handle_post/2
         ]).
 
+%%_* Includes ==================================================================
+-include("kastle.hrl").
+
 %%_* Records ===================================================================
--record(state, { topic     :: {binary(), binary()}
-               , partition :: {binary(), binary()}
-               }).
+-record(state, {}).
 
 %%_* Macros ====================================================================
 -define(TOPIC_REQ,     topic).
 -define(PARTITION_REQ, partition).
--define(DEFAULT_TOPIC, <<"undefined">>).
--define(DEFAULT_PARTITION, <<"0">>).  %% At the moment no need for default partition
-                                      %% as it must be a part of path according to API
--define(DEFAULT_TOPIC_RESTART_DELAY, 10).
--define(DEFAULT_PARTITION_RESTART_DELAY, 2).
--define(DEFAULT_REQUIRED_ACKS, -1).
--define(MESSAGE_KEY, <<"key">>).
--define(MESSAGE_VALUE, <<"value">>).
 
 %%_* cowboy handler callbacks ==================================================
 
@@ -63,17 +55,9 @@ init({tcp, http}, _, _) ->
 
 %%_* cowboy rest callbacks =====================================================
 
--spec rest_init(cowboy_req:req(), _) ->
-                   {ok, cowboy_req:req(), #state{}}.
-rest_init(Req0, _) ->
-  {Topic, Req1}    = cowboy_req:binding(?TOPIC_REQ,     Req0, ?DEFAULT_TOPIC),
-  {Partition, Req} = cowboy_req:binding(?PARTITION_REQ, Req1, ?DEFAULT_PARTITION),
-  {ok, Req, #state{topic = Topic, partition = Partition}}.
-
--spec rest_terminate(cowboy_req:req(), #state{}) -> ok.
-rest_terminate(_Req, _State) ->
-  %% TODO: We might need to add some logging here
-  ok.
+-spec rest_init(cowboy_req:req(), _) -> {ok, cowboy_req:req(), #state{}}.
+rest_init(Req, _) ->
+  {ok, Req, #state{}}.
 
 -spec allowed_methods(cowboy_req:req(), #state{}) ->
                          {[binary()], cowboy_req:req(), #state{}}.
@@ -88,83 +72,126 @@ charsets_provided(Req, State) ->
 -spec content_types_accepted(cowboy_req:req(), #state{}) ->
                                 {[_], cowboy_req:req(), #state{}}.
 content_types_accepted(Req, State) ->
-  {[{{<<"application">>, <<"json">>, []}, handler}], Req, State}.
+  {[{{<<"application">>, <<"json">>, []}, handle_post}], Req, State}.
 
--spec malformed_request(cowboy_req:req(), #state{}) ->
-                           {boolean(), cowboy_req:req(), #state{}}.
-malformed_request(Req, State) ->
-  {false, Req, State}.
+-spec content_types_provided(cowboy_req:req(), #state{}) ->
+                                {[_], cowboy_req:req(), #state{}}.
+content_types_provided(Req, State) ->
+  %% callback will be called for GET and HEAD only
+  {[{{<<"application">>, <<"json">>, []}, none}], Req, State}.
 
--spec handler(cowboy_req:req(), #state{}) ->
-                 {true | false, cowboy_req:req(), #state{}}.
-handler(Req0, State = #state{topic = Topic, partition = Partition0}) ->
-  PartitionResult = string:to_integer(binary_to_list(Partition0)),
-  JsonBodyResult = extract_json_body(Req0),
-  {Result, Req} = do_handle(Topic, PartitionResult, JsonBodyResult),
-  {Result, Req, State}.
+-spec handle_post(cowboy_req:req(), #state{}) ->
+                     {halt, cowboy_req:req(), #state{}}.
+handle_post(Req0, State) ->
+  {Topic, Req1} = cowboy_req:binding(?TOPIC_REQ, Req0),
+  {Partition, Req2} = cowboy_req:binding(?PARTITION_REQ, Req1),
+  {ok, Body, Req3} = cowboy_req:body(Req2),
+  {ok, Req} =
+    case do_handle_post(Topic,
+                        validate_partition(Partition),
+                        validate_body(Body)) of
+      ok ->
+        log_info(Req3, 204),
+        cowboy_req:reply(204, Req3);
+      {error, Error} ->
+        log_error(Req3, 400, Error),
+        cowboy_req:reply(400, [], jiffy:encode(#{error => Error}), Req3);
+      {error, Code, Error} ->
+        log_error(Req3, Code, Error),
+        cowboy_req:reply(Code, [], jiffy:encode(#{error => Error}), Req3)
+    end,
+  {halt, Req, State}.
 
-%% =============================================================================
-%% === Internal functions
-%% =============================================================================
-extract_json_body(Req0) ->
-  {ok, Body, Req} = cowboy_req:body(Req0),
-  do_decode(catch jiffy:decode(Body), Req).
+%%_* Internal functions ========================================================
+log_error(Req, ResponseCode, Error) ->
+  do_log(error, Req, ResponseCode, ", error: ~p", [Error]).
 
-do_decode({JsonBody}, Req) -> validate_json(is_valid_json_body(JsonBody), Req);
-do_decode({error, _Whatever}, Req) -> {error, Req}.
+log_info(Req, ResponseCode) ->
+  do_log(info, Req, ResponseCode).
 
-do_handle(_Topic, _Partition, {error, Req}) -> {false, Req};
-do_handle(_Topic, {error, no_integer}, {ok, {_Key, _Message}, Req}) -> {false, Req};
-do_handle(Topic, {Partition, []}, {ok, {Key, Message}, Req}) when is_integer(Partition) ->
-  {handle_produce(Topic, Partition, [{Key, Message}]), Req}.
+do_log(Level, Req, ResponseCode) ->
+  do_log(Level, Req, ResponseCode, "", []).
 
-validate_json({true, {Key, Message}}, Req) -> {ok, {Key, Message}, Req};
-validate_json(false, Req) -> {error, Req}.
+do_log(Level, Req, ResponseCode, ExtraFmt, ExtraArgs) ->
+  {Method, _} = cowboy_req:method(Req),
+  {Path, _} = cowboy_req:path(Req),
+  {Version, _} = cowboy_req:version(Req),
+  {UserAgent, _} = cowboy_req:header(<<"user-agent">>, Req),
+  {Host, _} = cowboy_req:header(<<"host">>, Req),
+  {ContentType, _} = cowboy_req:header(<<"content-type">>, Req),
+  {ContentLength, _} = cowboy_req:header(<<"content-length">>, Req),
+  Format = "~s ~s ~s ~B, user-agent: ~s, host: ~s, content-type: ~s, content-length: ~s" ++ ExtraFmt,
+  Args = [Method, Path, Version, ResponseCode, UserAgent, Host, ContentType, ContentLength] ++ ExtraArgs,
+  lager:log(Level, self(), Format, Args).
 
-is_valid_json_body(JsonBody) ->
-  check_message(get_message_key(JsonBody), get_message_value(JsonBody)).
+validate_partition(Partition) ->
+  string:to_integer(binary_to_list(Partition)).
 
-get_message_key(JsonBody) ->
-  get_value(lists:keyfind(?MESSAGE_KEY, 1, JsonBody)).
+validate_body(Body) ->
+  do_validate_body(catch jiffy:decode(Body, [return_maps])).
 
-get_message_value(JsonBody) ->
-  get_value(lists:keyfind(?MESSAGE_VALUE, 1, JsonBody)).
+do_validate_body({error, _Whatever}) ->
+  {error, <<"invalid json">>};
+do_validate_body(Data) ->
+  case jesse:validate(?KASTLE_JSON_SCHEMA, Data) of
+    {ok, _} = Res ->
+      Res;
+    {error, JesseErrors} ->
+      parse_jesse_errors(JesseErrors)
+  end.
 
-get_value({?MESSAGE_KEY, KeyValue}) -> KeyValue;
-get_value({?MESSAGE_VALUE, MessageValue}) -> MessageValue;
-get_value(false) -> false.
+parse_jesse_errors([{data_invalid, _Schema, ErrorType, _Value, _Path}]) ->
+  ErrorMsg = iolist_to_binary(io_lib:format("json schema validation failed: ~p", [ErrorType])),
+  {error, ErrorMsg};
+parse_jesse_errors([{schema_invalid, Schema, ErrorType}]) ->
+  lager:error("Invalid schema: ~p, ~p", [Schema, ErrorType]),
+  {error, 500, <<"error validating json, please contact service maintainers">>};
+parse_jesse_errors(Other) ->
+  lager:error("Unexpected jesse error(s): ~p", [Other]),
+  {error, 500, <<"error validating json, please contact service maintainers">>}.
 
-check_message(false, _) -> false;
-check_message(_, false) -> false;
-check_message(Key, Value) -> {true, {Key, Value}}.
+do_handle_post(_Topic, _Partition, {error, _Any} = Error) ->
+  Error;
+do_handle_post(_Topic, _Partition, {error, _Code, _Any} = Error) ->
+  Error;
+do_handle_post(_Topic, {error, no_integer}, _Data) ->
+  {error, <<"invalid partition">>};
+do_handle_post(Topic, {Partition, []}, {ok, Data}) when is_integer(Partition) ->
+  Key = maps:get(?MESSAGE_KEY, Data),
+  Value = maps:get(?MESSAGE_VALUE, Data),
+  produce(Topic, Partition, [{Key, Value}]).
 
-handle_produce(Topic, Partition, [{MessageKey, MessageValue}]) ->
-  do_handle_produce(get_producers_pid(Topic, Partition), MessageKey, MessageValue).
+produce(Topic, Partition, [{Key, Value}]) ->
+  case get_producer(Topic, Partition) of
+    {error, topic_not_found} ->
+      {error, 404, <<"topic not found">>};
+    {error, {producer_not_found, _Topic}} ->
+      {error, 404, <<"topic not found">>};
+    {error, {producer_not_found, _Topic, _Partition}} ->
+      {error, 404, <<"partition not found">>};
+    {error, _} -> % client_down or producer_down
+      {error, 503, <<"infrastructure down">>};
+    {ok, Producer} ->
+      brod:produce_sync(Producer, Key, Value)
+  end.
 
-do_handle_produce({error, no_such_producer}, _Key, _Value) -> false;
-do_handle_produce({ok, Producer}, Key, Value) when is_pid(Producer) ->
-  do_produce_sync(brod:produce_sync(Producer, Key, Value)).
+get_producer(Topic, Partition) ->
+  case brod:get_producer(?BROD_CLIENT, Topic, Partition) of
+    {error, _Any} ->
+      try_start_producer(Topic, Partition);
+    {ok, Producer} ->
+      {ok, Producer}
+  end.
 
-do_produce_sync(ok) -> true;
-do_produce_sync({error, _}) -> false. %% TODO: handle it differently from 400 code
-
-get_producers_pid(Topic, Partition) ->
-  do_get_producer(brod:get_producer(kastle_kafka_client, Topic, Partition), Partition).
-
-do_get_producer({ok, Producer}, _Partition) when is_pid(Producer) -> {ok, Producer};
-do_get_producer({error, {producer_down, noproc}}, _Partition) -> {error, no_such_producer};
-do_get_producer({error, {producer_not_found, _Topic, _Partition}}, _Partition) -> {error, no_such_producer};
-do_get_producer({error, {producer_not_found, Topic}}, Partition) ->
-  ProducerConfig = [ {topic_restart_delay_seconds, ?DEFAULT_TOPIC_RESTART_DELAY} %% topic error
-                   , {partition_restart_delay_seconds, ?DEFAULT_PARTITION_RESTART_DELAY} %% partition error
-                   , {required_acks, ?DEFAULT_REQUIRED_ACKS} ],
-  do_start_producer(brod:start_producer(kastle_kafka_client, Topic, ProducerConfig), Topic, Partition).
-
-do_get_producer2({ok, Producer}) when is_pid(Producer) -> {ok, Producer};
-do_get_producer2({error, _Whatever}) -> {error, no_such_producer}.
-
-do_start_producer(ok, Topic, Partition) -> do_get_producer2(brod:get_producer(kastle_kafka_client, Topic, Partition));
-do_start_producer({error, _}, _Topic, _Partition) -> {error, no_such_producer}.
+try_start_producer(Topic, Partition) ->
+  case brod:start_producer(?BROD_CLIENT, Topic, kastle:get_producer_config()) of
+    {error, topic_not_found} = Error ->
+      Error;
+    {error, {already_started, _}} -> % may be by another request?
+      brod:get_producer(?BROD_CLIENT, Topic, Partition);
+    ok ->
+      brod:get_producer(?BROD_CLIENT, Topic, Partition)
+  end.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
