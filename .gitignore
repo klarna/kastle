@@ -1,0 +1,17 @@
+doc/
+erl_crash.dump
+.eunit/
+.rebar/
+.erlang.mk/
+.idea/
+deps/
+ebin/
+kastle.d
+kastle.plt
+kastle.iml
+.kastle.plt
+rel/sys.config
+_rel/
+relx
+logs/
+*.beam
