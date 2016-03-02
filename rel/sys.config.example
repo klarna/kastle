@@ -2,12 +2,9 @@
 [ { lager,
    [ { log_root, "log" }
    , { crash_log, "crash.log" }
+   , { colored, true }
    , { handlers
-     , [ { lager_console_backend
-         , [ info
-           , {lager_default_formatter, [date, " ", time, " [",severity,"] ", module, "(", pid, "): ", message, "\n"]}
-           ]
-         }
+     , [ { lager_console_backend, info }
        , { lager_file_backend, [ {file, "error.log"},  {level, error}]}
        , { lager_file_backend, [ {file, "warn.log"},   {level, warning}]}
        , { lager_file_backend, [ {file, "info.log"},   {level, info}]}
