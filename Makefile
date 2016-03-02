@@ -9,6 +9,11 @@ dep_brod = git https://github.com/klarna/brod.git 2.0-dev
 
 include erlang.mk
 
+all:: rel/sys.config
+
+rel/sys.config: | rel/sys.config.example
+	cp $| $@
+
 # Compile flags
 ERLC_COMPILE_OPTS = +'{parse_transform, lager_transform}' -DAPPLICATION=kastle
 
