@@ -21,11 +21,20 @@ ERLC_COMPILE_OPTS = +'{parse_transform, lager_transform}' -DAPPLICATION=kastle
 ERLC_OPTS += $(ERLC_COMPILE_OPTS)
 TEST_ERLC_OPTS += $(ERLC_COMPILE_OPTS)
 
-.PHONY: test-env t
+.PHONY: test-env stop-daemon start-daemon t
 
-test-env: rel
+test-env:
 	./scripts/setup-test-env.sh
 
-t: test-env ct
+stop-daemon:
+	./scripts/kastle-daemon.sh stop
+
+start-daemon:
+	./scripts/kastle-daemon.sh start
+
+clean-t: stop-daemon test-env t
+	$(verbose) :
+
+t: stop-daemon rel start-daemon ct
 	$(verbose) :
 
