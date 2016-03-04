@@ -59,9 +59,9 @@ start_link() ->
 init([]) ->
   Schema = #{<<"type">> => <<"object">>,
              <<"properties">> =>
-               #{?MESSAGE_KEY => #{ <<"type">> => <<"binary">>,
+               #{?MESSAGE_KEY => #{ <<"type">> => <<"string">>,
                                     <<"required">> => true},
-                 ?MESSAGE_VALUE => #{<<"type">> => <<"binary">>,
+                 ?MESSAGE_VALUE => #{<<"type">> => <<"string">>,
                                      <<"required">> => true}}},
   jesse:add_schema(?KASTLE_JSON_SCHEMA, Schema),
   Listener = make_ref(),

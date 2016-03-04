@@ -34,7 +34,8 @@
 
 %% Test cases
 -export([ t_produce_json_to_partition_1/1
-        , t_invalid_key/1
+        , t_produce_json_invalid_key/1
+        , t_produce_json_invalid_value/1
         , t_produce_binary_to_partition_1/1
         , t_produce_binary_to_partition_1_no_key/1
         ]).
@@ -90,7 +91,7 @@ t_produce_json_to_partition_1(Config) when is_list(Config) ->
   ?assert(ReturnCode >= 200 andalso ReturnCode < 300),
   ok.
 
-t_invalid_key(Config) when is_list(Config) ->
+t_produce_json_invalid_key(Config) when is_list(Config) ->
   Method = post,
   URL = "http://localhost:8092/rest/kafka/v0/kastle-3-2/0",
   Header = [],
@@ -99,8 +100,23 @@ t_invalid_key(Config) when is_list(Config) ->
   HTTPOptions = [],
   Options = [],
   R = httpc:request(Method, {URL, Header, Type, Body}, HTTPOptions, Options),
-  {ok, {{"HTTP/1.1", ReturnCode, _State}, _Head, _Body}} = R,
-  ?assert(ReturnCode >= 200 andalso ReturnCode < 300),
+  {ok, {{"HTTP/1.1", ReturnCode, _State}, _Head, RespBody}} = R,
+  ?assertEqual(400, ReturnCode),
+  ?assertEqual("{\"error\":\"json schema validation failed: wrong_type\"}", RespBody),
+  ok.
+
+t_produce_json_invalid_value(Config) when is_list(Config) ->
+  Method = post,
+  URL = "http://localhost:8092/rest/kafka/v0/kastle-3-2/0",
+  Header = [],
+  Type = "application/json",
+  Body = "{\"key\": \"\k\", \"value\": {\"a\":\"b\"}}",
+  HTTPOptions = [],
+  Options = [],
+  R = httpc:request(Method, {URL, Header, Type, Body}, HTTPOptions, Options),
+  {ok, {{"HTTP/1.1", ReturnCode, _State}, _Head, RespBody}} = R,
+  ?assertEqual(400, ReturnCode),
+  ?assertEqual("{\"error\":\"json schema validation failed: wrong_type\"}", RespBody),
   ok.
 
 t_produce_binary_to_partition_1(Config) when is_list(Config) ->
