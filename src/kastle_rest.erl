@@ -70,6 +70,7 @@ init([]) ->
   Host =
     { '_'
       , [ {<<"/rest/kafka/v0/:topic/:partition">>, [], kastle_handler, no_opts}
+        , {<<"/rest/kafka/v0/:topic">>, [], kastle_handler, no_opts}
         %, {<<"/ping">>,                            [], kastle_ping_handler, no_opts}
         ]
     },

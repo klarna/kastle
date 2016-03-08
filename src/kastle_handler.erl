@@ -114,7 +114,7 @@ handle_binary(Req0, State) ->
   {Key, Req3} = cowboy_req:header(?KAFKA_KEY_HEADER, Req2, <<>>),
   {ok, Value, Req4} = cowboy_req:body(Req3),
   {ok, Req} =
-    case do_handle_binary(Topic, validate_partition(Partition), Key, Value) of
+    case do_handle_binary(Topic, Partition, Key, Value) of
       ok ->
         log_info(Req4, 204),
         cowboy_req:reply(204, Req4);
@@ -184,15 +184,18 @@ do_handle_json(_Topic, {error, no_integer}, _Data) ->
 do_handle_json(Topic, {Partition, []}, {ok, Data}) when is_integer(Partition) ->
   Key = maps:get(?MESSAGE_KEY, Data),
   Value = maps:get(?MESSAGE_VALUE, Data),
-  produce(Topic, Partition, [{Key, Value}]).
+  produce(Topic, Partition, Key, Value).
 
+do_handle_binary(Topic, undefined, Key, Value) ->
+  produce(Topic, fun get_random_partition/4, Key, Value);
 do_handle_binary(_Topic, {error, no_integer}, _Key, _Value) ->
   {error, <<"invalid partition">>};
 do_handle_binary(Topic, {Partition, []}, Key, Value) when is_integer(Partition) ->
-  produce(Topic, Partition, [{Key, Value}]).
+  produce(Topic, Partition, Key, Value).
 
-produce(Topic, Partition, [{Key, Value}]) ->
-  case get_producer(Topic, Partition) of
+produce(Topic, Partition, Key, Value) ->
+  Res = brod:produce_sync(?BROD_CLIENT, Topic, Partition, Key, Value),
+  case Res of
     {error, topic_not_found} ->
       {error, 404, <<"topic not found">>};
     {error, {producer_not_found, _Topic}} ->
@@ -201,27 +204,12 @@ produce(Topic, Partition, [{Key, Value}]) ->
       {error, 404, <<"partition not found">>};
     {error, _} -> % client_down or producer_down
       {error, 503, <<"infrastructure down">>};
-    {ok, Producer} ->
-      brod:produce_sync(Producer, Key, Value)
-  end.
-
-get_producer(Topic, Partition) ->
-  case brod:get_producer(?BROD_CLIENT, Topic, Partition) of
-    {error, _Any} ->
-      try_start_producer(Topic, Partition);
-    {ok, Producer} ->
-      {ok, Producer}
-  end.
-
-try_start_producer(Topic, Partition) ->
-  case brod:start_producer(?BROD_CLIENT, Topic, kastle:get_producer_config()) of
-    {error, topic_not_found} = Error ->
-      Error;
-    {error, {already_started, _}} -> % may be by another request?
-      brod:get_producer(?BROD_CLIENT, Topic, Partition);
     ok ->
-      brod:get_producer(?BROD_CLIENT, Topic, Partition)
+      ok
   end.
+
+get_random_partition(_Topic, PartitionsCnt, _Key, _Value) ->
+  {ok, crypto:rand_uniform(0, PartitionsCnt)}.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

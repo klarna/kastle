@@ -20,11 +20,15 @@
         , [ { endpoints, [ {"localhost", 9092}
                          ]}
           , { config
-            , [ {restart_delay_seconds, 10} ] %% connection error
+            , [ {restart_delay_seconds, 10}
+              , {auto_start_producers, true}
             }
-          , { producer_config, [ {topic_restart_delay_seconds, 10}
-                               , {partition_restart_delay_seconds, 2}
-                               , {required_acks, -1}]}
+          , { default_producer_config,
+              [ {topic_restart_delay_seconds, 10}
+              , {partition_restart_delay_seconds, 2}
+              , {required_acks, -1}
+              ]
+            }
           ]
         }
       ]
