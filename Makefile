@@ -5,6 +5,8 @@ PROJECT_VERSION = 1.0.0
 # Whitespace to be used when creating files from templates.
 SP = 2
 DEPS = brod cowboy lager jiffy jesse
+TEST_DEPS = meck
+
 dep_brod = git https://github.com/klarna/brod.git add-option-to-autostart-producers
 
 rel:: rel/sys.config

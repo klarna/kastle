@@ -138,16 +138,21 @@ do_log(Level, Req, ResponseCode) ->
   do_log(Level, Req, ResponseCode, "", []).
 
 do_log(Level, Req, ResponseCode, ExtraFmt, ExtraArgs) ->
-  {Method, _} = cowboy_req:method(Req),
-  {Path, _} = cowboy_req:path(Req),
-  {Version, _} = cowboy_req:version(Req),
-  {UserAgent, _} = cowboy_req:header(<<"user-agent">>, Req),
-  {Host, _} = cowboy_req:header(<<"host">>, Req),
-  {ContentType, _} = cowboy_req:header(<<"content-type">>, Req),
-  {ContentLength, _} = cowboy_req:header(<<"content-length">>, Req),
-  Format = "~s ~s ~s ~B, user-agent: ~s, host: ~s, content-type: ~s, content-length: ~s" ++ ExtraFmt,
-  Args = [Method, Path, Version, ResponseCode, UserAgent, Host, ContentType, ContentLength] ++ ExtraArgs,
-  lager:log(Level, self(), Format, Args).
+  case ?SHOULD_LOG_OR_TRACE(Level) of
+    true ->
+      {Method, _} = cowboy_req:method(Req),
+      {Path, _} = cowboy_req:path(Req),
+      {Version, _} = cowboy_req:version(Req),
+      {UserAgent, _} = cowboy_req:header(<<"user-agent">>, Req),
+      {Host, _} = cowboy_req:header(<<"host">>, Req),
+      {ContentType, _} = cowboy_req:header(<<"content-type">>, Req),
+      {ContentLength, _} = cowboy_req:header(<<"content-length">>, Req),
+      Format = "~s ~s ~s ~B, user-agent: ~s, host: ~s, content-type: ~s, content-length: ~s" ++ ExtraFmt,
+      Args = [Method, Path, Version, ResponseCode, UserAgent, Host, ContentType, ContentLength] ++ ExtraArgs,
+      lager:log(Level, self(), Format, Args);
+    false ->
+      ok
+  end.
 
 validate_partition(Partition) ->
   string:to_integer(binary_to_list(Partition)).
