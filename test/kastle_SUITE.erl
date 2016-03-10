@@ -77,13 +77,13 @@ all() -> [F || {F, _A} <- module_info(exports),
 t_retry_partitions({init, Config}) ->
   lists:foreach(fun(M) ->
                     meck:new(M, [passthrough, no_passthrough_cover, no_history])
-                end, [brod, brod_client, cowboy_req, kastle_handler]),
+                end, [brod, brod_client, cowboy_req]),
   Config;
 t_retry_partitions({'end', Config}) ->
   lists:foreach(fun(M) ->
                     meck:validate(M),
                     meck:unload(M)
-                end, [brod, brod_client, cowboy_req, kastle_handler]),
+                end, [brod, brod_client, cowboy_req]),
   Config;
 t_retry_partitions(Config) when is_list(Config) ->
   ok = meck:expect(brod_client, get_partitions_count, fun(_, _) -> {ok, 3} end),
