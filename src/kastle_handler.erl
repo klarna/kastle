@@ -187,11 +187,33 @@ do_handle_json(Topic, {Partition, []}, {ok, Data}) when is_integer(Partition) ->
   produce(Topic, Partition, Key, Value).
 
 do_handle_binary(Topic, undefined, Key, Value) ->
-  produce(Topic, fun get_random_partition/4, Key, Value);
+  case produce(Topic, fun get_random_partition/4, Key, Value) of
+    {error, 503, <<"infrastructure down">>} = Error ->
+      %% try all available partitions
+      %% we're random anyway
+      {ok, PartitionsCnt} = brod_client:get_partitions_count(?BROD_CLIENT, Topic),
+      try_partitions(Topic, lists:seq(0, PartitionsCnt-1), Key, Value, Error);
+    {error, _, _} = Error ->
+      Error;
+    ok ->
+      ok
+  end;
 do_handle_binary(_Topic, {error, no_integer}, _Key, _Value) ->
   {error, <<"invalid partition">>};
 do_handle_binary(Topic, {Partition, []}, Key, Value) when is_integer(Partition) ->
   produce(Topic, Partition, Key, Value).
+
+try_partitions(_Topic, [], _Key, _Value, Error) ->
+  Error;
+try_partitions(Topic, [P | Partitions], Key, Value, _Error) ->
+  case produce(Topic, P, Key, Value) of
+    {error, 503, <<"infrastructure down">>} = Error ->
+      try_partitions(Topic, Partitions, Key, Value, Error);
+    {error, _, _} = Error ->
+      Error;
+    ok ->
+      ok
+  end.
 
 produce(Topic, Partition, Key, Value) ->
   Res = brod:produce_sync(?BROD_CLIENT, Topic, Partition, Key, Value),
