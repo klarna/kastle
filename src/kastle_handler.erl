@@ -234,7 +234,6 @@ try_partitions(Topic, [P | Partitions], Key, Value, _Error) ->
   end.
 
 produce(Topic, Partition, Key, Value) ->
-  lager:info("produce(~p, ~p, ~p, ~p)", [Topic, Partition, Key, Value]),
   Res = brod:produce_sync(?BROD_CLIENT, Topic, Partition, Key, Value),
   case Res of
     {error, topic_not_found} ->
