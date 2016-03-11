@@ -271,9 +271,10 @@ produce(Topic, Partition, Key, Value) ->
 
 error_503(Reason) ->
   {A, B, C} = os:timestamp(),
-  ID = ((A*1000000)+B)*1000000+C,
-  lager:log(error, self(), "error_503 (~w,~p): ~p", [ID, self(), Reason]),
-  Msg = io_lib:format("Service Unavailable (~w,~p)", [ID, self()]),
+  Ts = ((A*1000000)+B)*1000000+C,
+  TraceId = io_lib:format("(~p,~p,~w)", [node(), self(), Ts]),
+  lager:log(error, self(), "error_503 ~s: ~p", [TraceId, Reason]),
+  Msg = ["Service Unavailable. TraceID=", TraceId],
   {error, 503, iolist_to_binary(Msg)}.
 
 gen_random_list(Min, Max) ->
