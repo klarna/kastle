@@ -270,8 +270,7 @@ produce(Topic, Partition, Key, Value) ->
   end.
 
 error_503(Reason) ->
-  {A, B, C} = os:timestamp(),
-  Ts = ((A*1000000)+B)*1000000+C,
+  Ts = os:system_time(),
   TraceId = io_lib:format("(~p,~p,~w)", [node(), self(), Ts]),
   lager:log(error, self(), "error_503 ~s: ~p", [TraceId, Reason]),
   Msg = ["Service Unavailable. TraceID=", TraceId],
