@@ -207,7 +207,7 @@ do_handle_json(Topic, undefined, {ok, Data}) ->
       %% try all available partitions
       %% we're random anyway
       {ok, PartitionsCnt} = brod_client:get_partitions_count(?BROD_CLIENT, Topic),
-      try_partitions(Topic, gen_random_list(0, PartitionsCnt-1), Key, Value, Error);
+      try_partitions(Topic, gen_random_list(0, PartitionsCnt), Key, Value, Error);
     {error, _, _} = Error ->
       Error;
     ok ->
@@ -224,7 +224,7 @@ do_handle_binary(Topic, undefined, Key, Value) ->
       %% try all available partitions
       %% we're random anyway
       {ok, PartitionsCnt} = brod_client:get_partitions_count(?BROD_CLIENT, Topic),
-      try_partitions(Topic, gen_random_list(0, PartitionsCnt-1), Key, Value, Error);
+      try_partitions(Topic, gen_random_list(0, PartitionsCnt), Key, Value, Error);
     {error, _, _} = Error ->
       Error;
     ok ->
@@ -266,7 +266,7 @@ get_random_partition(_Topic, PartitionsCnt, _Key, _Value) ->
   {ok, crypto:rand_uniform(0, PartitionsCnt)}.
 
 gen_random_list(Min, Max) ->
-  L0 = [{crypto:rand_uniform(Min, Max), X} || X <- lists:seq(Min, Max)],
+  L0 = [{crypto:rand_uniform(Min, Max), X} || X <- lists:seq(Min, Max-1)],
   {_, L} = lists:unzip(lists:keysort(1, L0)),
   L.
 
