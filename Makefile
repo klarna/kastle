@@ -1,5 +1,5 @@
 PROJECT = kastle
-PROJECT_DESCRIPTION = Apache Kafka REST interface
+PROJECT_DESCRIPTION = Apache Kafka REST Proxy
 PROJECT_VERSION = 1.0.0
 
 # Whitespace to be used when creating files from templates.
@@ -40,3 +40,16 @@ clean-t: stop-daemon test-env t
 t: stop-daemon rel start-daemon ct
 	$(verbose) :
 
+TOPDIR = /tmp/kastle-rpm
+PWD = $(shell pwd)
+
+rpm: all
+	@rpmbuild -v -bb \
+			--define "_sourcedir $(PWD)" \
+			--define "_builddir $(PWD)" \
+			--define "_rpmdir $(PWD)" \
+			--define "_topdir $(TOPDIR)" \
+			--define "_name $(PROJECT)" \
+			--define "_description $(PROJECT_DESCRIPTION)" \
+			--define "_version $(PROJECT_VERSION)" \
+			rpm/kastle.spec

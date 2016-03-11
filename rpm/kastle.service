@@ -1,0 +1,16 @@
+[Unit]
+Description=Apache Kafka REST Proxy
+After=network.target
+
+[Service]
+User=kastle
+Group=kastle
+Restart=on-failure
+Environment=RUNNER_LOG_DIR=/var/log/kastle
+Environment=RELX_CONFIG_PATH=/etc/kastle/sys.config
+Environment=VMARGS_PATH=/etc/kastle/vm.args
+ExecStart=/opt/kastle/bin/kastle foreground
+ExecStop=/opt/kastle/bin/kastle stop
+
+[Install]
+WantedBy=multi-user.target

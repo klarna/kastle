@@ -1,0 +1,68 @@
+%define debug_package %{nil}
+%define _service      %{_name}
+%define _user         %{_name}
+%define _group        %{_name}
+%define _prefix      /opt
+%define _conf_dir    %{_sysconfdir}/%{_name}
+%define _log_dir     %{_var}/log/%{_name}
+
+Summary: %{_description}
+Name: %{_name}
+Version: %{_version}
+Release: 1%{?dist}
+License: Apache License, Version 2.0
+oURL: https://github.com/klarna/kastle
+BuildRoot: %{_tmppath}/%{_name}-%{_version}-root
+Prefix: %{_prefix}
+Prefix: %{_conf_dir}
+Prefix: %{_log_dir}
+Vendor: Klarna AB
+Packager: Ivan Dyachkov <ivan.dyachkov@klarna.com>
+Provides: %{_name}
+BuildRequires: systemd
+%systemd_requires
+
+%description
+%{_description}
+
+%prep
+
+%build
+
+%install
+mkdir -p $RPM_BUILD_ROOT%{_prefix}
+mkdir -p $RPM_BUILD_ROOT%{_log_dir}
+mkdir -p $RPM_BUILD_ROOT%{_unitdir}
+mkdir -p $RPM_BUILD_ROOT%{_conf_dir}
+cp -r _rel/kastle %{buildroot}%{_prefix}/
+install -p -D -m 0644 rpm/%{_service}.service %{buildroot}%{_unitdir}/%{_service}.service
+install -p -D -m 0644 rel/sys.config %{buildroot}%{_conf_dir}/sys.config
+install -p -D -m 0644 rel/vm.args %{buildroot}%{_conf_dir}/vm.args
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%pre
+if [ $1 = 1 ]; then
+  # Initial installation
+  /usr/bin/getent group %{_group} >/dev/null || /usr/sbin/groupadd -r %{_group}
+  if ! /usr/bin/getent passwd %{_user} >/dev/null ; then
+      /usr/sbin/useradd -r -g %{_group} -c "%{_name}" %{_user}
+  fi
+fi
+
+%post
+%systemd_post %{_service}.service
+
+%preun
+%systemd_preun %{_service}.service
+
+%postun
+%systemd_postun
+
+%files
+%defattr(-,root,root)
+%{_prefix}/%{_name}
+%{_unitdir}/%{_service}.service
+%config(noreplace) %{_conf_dir}/*
+%attr(0755,%{_user},%{_group}) %dir %{_log_dir}
