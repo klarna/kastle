@@ -199,6 +199,20 @@ do_handle_json(_Topic, _Partition, {error, _Code, _Any} = Error) ->
   Error;
 do_handle_json(_Topic, {error, no_integer}, _Data) ->
   {error, <<"invalid partition">>};
+do_handle_json(Topic, undefined, {ok, Data}) ->
+  Key = maps:get(?MESSAGE_KEY, Data),
+  Value = maps:get(?MESSAGE_VALUE, Data),
+  case produce(Topic, fun get_random_partition/4, Key, Value) of
+    {error, 503, <<"infrastructure down">>} = Error ->
+      %% try all available partitions
+      %% we're random anyway
+      {ok, PartitionsCnt} = brod_client:get_partitions_count(?BROD_CLIENT, Topic),
+      try_partitions(Topic, gen_random_list(0, PartitionsCnt-1), Key, Value, Error);
+    {error, _, _} = Error ->
+      Error;
+    ok ->
+      ok
+  end;
 do_handle_json(Topic, {Partition, []}, {ok, Data}) when is_integer(Partition) ->
   Key = maps:get(?MESSAGE_KEY, Data),
   Value = maps:get(?MESSAGE_VALUE, Data),
@@ -210,7 +224,7 @@ do_handle_binary(Topic, undefined, Key, Value) ->
       %% try all available partitions
       %% we're random anyway
       {ok, PartitionsCnt} = brod_client:get_partitions_count(?BROD_CLIENT, Topic),
-      try_partitions(Topic, lists:seq(0, PartitionsCnt-1), Key, Value, Error);
+      try_partitions(Topic, gen_random_list(0, PartitionsCnt-1), Key, Value, Error);
     {error, _, _} = Error ->
       Error;
     ok ->
@@ -250,6 +264,11 @@ produce(Topic, Partition, Key, Value) ->
 
 get_random_partition(_Topic, PartitionsCnt, _Key, _Value) ->
   {ok, crypto:rand_uniform(0, PartitionsCnt)}.
+
+gen_random_list(Min, Max) ->
+  L0 = [{crypto:rand_uniform(Min, Max), X} || X <- lists:seq(Min, Max)],
+  {_, L} = lists:unzip(lists:keysort(1, L0)),
+  L.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
