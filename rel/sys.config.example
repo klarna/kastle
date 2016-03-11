@@ -10,7 +10,7 @@
        , { lager_file_backend, [ {file, "info.log"},   {level, info}]}
        %% This backend should only be used for development,
        %% remove it for production.
-       , { lager_file_backend, [ {file, "debug.log"},  {level, debug}]}
+       %, { lager_file_backend, [ {file, "debug.log"},  {level, debug}]}
        ]
      }
    ]}

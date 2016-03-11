@@ -4,14 +4,14 @@
 %define _group        %{_name}
 %define _prefix      /opt
 %define _conf_dir    %{_sysconfdir}/%{_name}
-%define _log_dir     %{_var}/log/%{_name}
+%define _log_dir     /var/log/%{_name}
 
 Summary: %{_description}
 Name: %{_name}
 Version: %{_version}
 Release: 1%{?dist}
 License: Apache License, Version 2.0
-oURL: https://github.com/klarna/kastle
+URL: https://github.com/klarna/kastle
 BuildRoot: %{_tmppath}/%{_name}-%{_version}-root
 Prefix: %{_prefix}
 Prefix: %{_conf_dir}
@@ -38,6 +38,7 @@ cp -r _rel/kastle %{buildroot}%{_prefix}/
 install -p -D -m 0644 rpm/%{_service}.service %{buildroot}%{_unitdir}/%{_service}.service
 install -p -D -m 0644 rel/sys.config %{buildroot}%{_conf_dir}/sys.config
 install -p -D -m 0644 rel/vm.args %{buildroot}%{_conf_dir}/vm.args
+sed -i 's/log_root.*$/log_root, \"\/var\/log\/%{_name}\" }/' %{buildroot}%{_conf_dir}/sys.config
 
 %clean
 rm -rf $RPM_BUILD_ROOT
