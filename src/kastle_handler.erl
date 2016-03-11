@@ -270,10 +270,11 @@ produce(Topic, Partition, Key, Value) ->
   end.
 
 error_503(Reason) ->
-  {error, 503, fmt_error_reason(Reason)}.
-
-fmt_error_reason(Reason) ->
-  iolist_to_binary(io_lib:format("~100000p", [Reason])).
+  {A, B, C} = os:timestamp(),
+  ID = ((A*1000000)+B)*1000000+C,
+  lager:log(error, self(), "error_503 (~w,~p): ~p", [ID, self(), Reason]),
+  Msg = io_lib:format("Service Unavailable (~w,~p)", [ID, self()]),
+  {error, 503, iolist_to_binary(Msg)}.
 
 gen_random_list(Min, Max) ->
   L0 = [{crypto:rand_uniform(0,1 bsl 32), X} || X <- lists:seq(Min, Max)],

@@ -141,9 +141,9 @@ t_produce_binary_to_partition_1(Config) when is_list(Config) ->
 t_produce_binary_to_partition_1_no_key(Config) when is_list(Config) ->
   Method = post,
   URL = "http://localhost:8092/rest/kafka/v0/kastle-3-2/0",
-  {_K, V} = make_unique_kv(),
+  %{_K, V} = make_unique_kv(),
   Header = [],
-  Body = V,
+  Body = crypto:rand_bytes(1000000),
   Type = "application/binary",
   HTTPOptions = [],
   Options = [],
