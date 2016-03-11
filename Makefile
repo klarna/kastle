@@ -7,7 +7,7 @@ SP = 2
 DEPS = brod cowboy lager jiffy jesse
 TEST_DEPS = meck
 
-dep_brod = git https://github.com/klarna/brod.git add-option-to-autostart-producers
+dep_brod = git https://github.com/klarna/brod.git 2.0-dev
 
 rel:: rel/sys.config
 

@@ -26,14 +26,6 @@
 
 -define(BROD_CLIENT, kastle_kafka_client).
 
--define(SHOULD_LOG_OR_TRACE(Level),
-        begin
-          {CurrentLevel, Traces} = lager_config:get(loglevel, {?LOG_NONE, []}),
-          (lager_util:level_to_num(Level) band CurrentLevel) /= 0 orelse
-            Traces /= []
-        end
-       ).
-
 -endif. % include kastle.hrl
 
 %%%_* Emacs ====================================================================

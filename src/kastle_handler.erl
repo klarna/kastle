@@ -95,13 +95,13 @@ handle_json(Req0, State) ->
                         validate_partition(Partition),
                         validate_body(Body)) of
       ok ->
-        log_info(Req3, 204),
+        server_log(info, Req3, 204),
         cowboy_req:reply(204, Req3);
       {error, Error} ->
-        log_error(Req3, 400, Error),
+        server_log(error, Req3, 400, "error: ~p", [Error]),
         cowboy_req:reply(400, [], jiffy:encode(#{error => Error}), Req3);
       {error, Code, Error} ->
-        log_error(Req3, Code, Error),
+        server_log(error, Req3, Code, "error: ~p", [Error]),
         cowboy_req:reply(Code, [], jiffy:encode(#{error => Error}), Req3)
     end,
   {halt, Req, State}.
@@ -116,30 +116,45 @@ handle_binary(Req0, State) ->
   {ok, Req} =
     case do_handle_binary(Topic, Partition, Key, Value) of
       ok ->
-        log_info(Req4, 204),
+        server_log(info, Req4, 204),
         cowboy_req:reply(204, Req4);
       {error, Error} ->
-        log_error(Req4, 400, Error),
+        server_log(error, Req4, 400, "error: ~p", [Error]),
         cowboy_req:reply(400, [], jiffy:encode(#{error => Error}), Req4);
       {error, Code, Error} ->
-        log_error(Req4, Code, Error),
+        server_log(error, Req4, Code, "error: ~p", [Error]),
         cowboy_req:reply(Code, [], jiffy:encode(#{error => Error}), Req4)
     end,
   {halt, Req, State}.
 
 %%_* Internal functions ========================================================
-log_error(Req, ResponseCode, Error) ->
-  do_log(error, Req, ResponseCode, ", error: ~p", [Error]).
+server_log(Level, Req, ResponseCode) ->
+  server_log(Level, Req, ResponseCode, "", []).
 
-log_info(Req, ResponseCode) ->
-  do_log(info, Req, ResponseCode).
+server_log(Level, Req, ResponseCode, ExtraFmt, ExtraArgs) ->
+  Format = get_server_log_fmt_fun(ExtraFmt),
+  Args = get_server_log_fmt_args_fun(Req, ResponseCode, ExtraArgs),
+  do_log(Level, Format, Args).
 
-do_log(Level, Req, ResponseCode) ->
-  do_log(Level, Req, ResponseCode, "", []).
-
-do_log(Level, Req, ResponseCode, ExtraFmt, ExtraArgs) ->
-  case ?SHOULD_LOG_OR_TRACE(Level) of
+do_log(Level, Format, Args) when is_list(Args) ->
+  lager:log(Level, self(), Format, Args);
+do_log(Level, Format, Args) when is_function(Format), is_function(Args) ->
+  case should_log_or_trace(Level) of
     true ->
+      lager:log(Level, self(), Format(), Args());
+    false ->
+      ok
+  end.
+
+should_log_or_trace(Level) ->
+  {CurrentLevel, Traces} = lager_config:get(loglevel, {?LOG_NONE, []}),
+  (lager_util:level_to_num(Level) band CurrentLevel) /= 0 orelse Traces /= [].
+
+get_server_log_fmt_fun(ExtraFmt) ->
+  fun() -> "~s ~s ~s ~B, user-agent: ~s, host: ~s, content-type: ~s, content-length: ~s, " ++ ExtraFmt end.
+
+get_server_log_fmt_args_fun(Req, ResponseCode, ExtraArgs) ->
+  fun() ->
       {Method, _} = cowboy_req:method(Req),
       {Path, _} = cowboy_req:path(Req),
       {Version, _} = cowboy_req:version(Req),
@@ -147,11 +162,7 @@ do_log(Level, Req, ResponseCode, ExtraFmt, ExtraArgs) ->
       {Host, _} = cowboy_req:header(<<"host">>, Req),
       {ContentType, _} = cowboy_req:header(<<"content-type">>, Req),
       {ContentLength, _} = cowboy_req:header(<<"content-length">>, Req),
-      Format = "~s ~s ~s ~B, user-agent: ~s, host: ~s, content-type: ~s, content-length: ~s" ++ ExtraFmt,
-      Args = [Method, Path, Version, ResponseCode, UserAgent, Host, ContentType, ContentLength] ++ ExtraArgs,
-      lager:log(Level, self(), Format, Args);
-    false ->
-      ok
+      [Method, Path, Version, ResponseCode, UserAgent, Host, ContentType, ContentLength] ++ ExtraArgs
   end.
 
 validate_partition(Partition) ->
