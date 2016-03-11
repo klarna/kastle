@@ -43,6 +43,11 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
+-define(assertOK(Code, Msg), case Code >= 200 andalso Code < 300 of
+                               true  -> ok;
+                               false -> ct:fail("~p: ~s", [Code, Msg])
+                             end).
+
 %%%_* ct callbacks =============================================================
 
 suite() -> [{timetrap, {seconds, 30}}].
@@ -87,8 +92,8 @@ t_produce_json_to_partition_1(Config) when is_list(Config) ->
   HTTPOptions = [],
   Options = [],
   R = httpc:request(Method, {URL, Header, Type, Body}, HTTPOptions, Options),
-  {ok, {{"HTTP/1.1", ReturnCode, _State}, _Head, _Body}} = R,
-  ?assert(ReturnCode >= 200 andalso ReturnCode < 300),
+  {ok, {{"HTTP/1.1", ReturnCode, _State}, _Head, ReplyBody}} = R,
+  ?assertOK(ReturnCode, ReplyBody),
   ok.
 
 t_produce_json_invalid_key(Config) when is_list(Config) ->
@@ -129,8 +134,8 @@ t_produce_binary_to_partition_1(Config) when is_list(Config) ->
   HTTPOptions = [],
   Options = [],
   R = httpc:request(Method, {URL, Header, Type, Body}, HTTPOptions, Options),
-  {ok, {{"HTTP/1.1", ReturnCode, _State}, _Head, _Body}} = R,
-  ?assert(ReturnCode >= 200 andalso ReturnCode < 300),
+  {ok, {{"HTTP/1.1", ReturnCode, _State}, _Head, ReplyBody}} = R,
+  ?assertOK(ReturnCode, ReplyBody),
   ok.
 
 t_produce_binary_to_partition_1_no_key(Config) when is_list(Config) ->
@@ -143,8 +148,8 @@ t_produce_binary_to_partition_1_no_key(Config) when is_list(Config) ->
   HTTPOptions = [],
   Options = [],
   R = httpc:request(Method, {URL, Header, Type, Body}, HTTPOptions, Options),
-  {ok, {{"HTTP/1.1", ReturnCode, _State}, _Head, _Body}} = R,
-  ?assert(ReturnCode >= 200 andalso ReturnCode < 300),
+  {ok, {{"HTTP/1.1", ReturnCode, _State}, _Head, ReplyBody}} = R,
+  ?assertOK(ReturnCode, ReplyBody),
   ok.
 
 %%%_* Help functions ===========================================================
