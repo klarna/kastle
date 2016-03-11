@@ -92,8 +92,8 @@ handle_json(Req0, State) ->
   {ok, Body, Req3} = cowboy_req:body(Req2),
   {ok, Req} =
     case do_handle_json(Topic,
-                        validate_partition(Partition),
-                        validate_body(Body)) of
+                        parse_partition(Partition),
+                        parse_body(Body)) of
       ok ->
         server_log(info, Req3, 204),
         cowboy_req:reply(204, Req3);
@@ -114,7 +114,7 @@ handle_binary(Req0, State) ->
   {Key, Req3} = cowboy_req:header(?KAFKA_KEY_HEADER, Req2, <<>>),
   {ok, Value, Req4} = cowboy_req:body(Req3),
   {ok, Req} =
-    case do_handle_binary(Topic, Partition, Key, Value) of
+    case do_handle_binary(Topic, parse_partition(Partition), Key, Value) of
       ok ->
         server_log(info, Req4, 204),
         cowboy_req:reply(204, Req4);
@@ -165,15 +165,17 @@ get_server_log_fmt_args_fun(Req, ResponseCode, ExtraArgs) ->
       [Method, Path, Version, ResponseCode, UserAgent, Host, ContentType, ContentLength] ++ ExtraArgs
   end.
 
-validate_partition(Partition) ->
-  string:to_integer(binary_to_list(Partition)).
+parse_partition(Partition) when is_binary(Partition) ->
+  string:to_integer(binary_to_list(Partition));
+parse_partition(Partition) ->
+  Partition.
 
-validate_body(Body) ->
-  do_validate_body(catch jiffy:decode(Body, [return_maps])).
+parse_body(Body) ->
+  do_parse_body(catch jiffy:decode(Body, [return_maps])).
 
-do_validate_body({error, _Whatever}) ->
+do_parse_body({error, _Whatever}) ->
   {error, <<"invalid json">>};
-do_validate_body(Data) ->
+do_parse_body(Data) ->
   case jesse:validate(?KASTLE_JSON_SCHEMA, Data) of
     {ok, _} = Res ->
       Res;
@@ -232,6 +234,7 @@ try_partitions(Topic, [P | Partitions], Key, Value, _Error) ->
   end.
 
 produce(Topic, Partition, Key, Value) ->
+  lager:info("produce(~p, ~p, ~p, ~p)", [Topic, Partition, Key, Value]),
   Res = brod:produce_sync(?BROD_CLIENT, Topic, Partition, Key, Value),
   case Res of
     {error, topic_not_found} ->
