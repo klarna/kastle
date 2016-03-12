@@ -49,6 +49,12 @@
 
 -define(KAFKA_KEY_HEADER, <<"kafka-key">>).
 
+-type key() :: binary().
+-type value() :: binary().
+-type topic() :: binary().
+-type partition() :: non_neg_integer().
+-type http_code() :: pos_integer().
+
 %%_* cowboy handler callbacks ==================================================
 
 -spec init({atom(), atom()}, cowboy_req:req(), _) ->
@@ -202,45 +208,43 @@ do_handle_json(_Topic, {error, no_integer}, _Data) ->
 do_handle_json(Topic, undefined, {ok, Data}) ->
   Key = maps:get(?MESSAGE_KEY, Data),
   Value = maps:get(?MESSAGE_VALUE, Data),
-  case produce(Topic, fun get_random_partition/4, Key, Value) of
-    {error, 503, <<"infrastructure down">>} = Error ->
-      %% try all available partitions
-      %% we're random anyway
-      {ok, PartitionsCnt} = brod_client:get_partitions_count(?BROD_CLIENT, Topic),
-      try_partitions(Topic, gen_random_list(0, PartitionsCnt), Key, Value, Error);
-    {error, _, _} = Error ->
-      Error;
-    ok ->
-      ok
-  end;
+  produce_to_random_partition(Topic, Key, Value);
 do_handle_json(Topic, {Partition, []}, {ok, Data}) when is_integer(Partition) ->
   Key = maps:get(?MESSAGE_KEY, Data),
   Value = maps:get(?MESSAGE_VALUE, Data),
   produce(Topic, Partition, Key, Value).
 
 do_handle_binary(Topic, undefined, Key, Value) ->
-  case produce(Topic, fun get_random_partition/4, Key, Value) of
-    {error, 503, <<"infrastructure down">>} = Error ->
-      %% try all available partitions
-      %% we're random anyway
-      {ok, PartitionsCnt} = brod_client:get_partitions_count(?BROD_CLIENT, Topic),
-      try_partitions(Topic, gen_random_list(0, PartitionsCnt), Key, Value, Error);
-    {error, _, _} = Error ->
-      Error;
-    ok ->
-      ok
-  end;
+  produce_to_random_partition(Topic, Key, Value);
 do_handle_binary(_Topic, {error, no_integer}, _Key, _Value) ->
   {error, <<"invalid partition">>};
 do_handle_binary(Topic, {Partition, []}, Key, Value) when is_integer(Partition) ->
   produce(Topic, Partition, Key, Value).
 
-try_partitions(_Topic, [], _Key, _Value, Error) ->
-  Error;
-try_partitions(Topic, [P | Partitions], Key, Value, _Error) ->
+-spec produce_to_random_partition(topic(), binary(), binary()) ->
+        ok | {error, http_code(), iodata()}.
+produce_to_random_partition(Topic, Key, Value) ->
+  %% try all available partitions
+  case brod_client:get_partitions_count(?BROD_CLIENT, Topic) of
+    {error, 'UnknownTopicOrPartition'} ->
+      {error, 404, <<"topic not found">>};
+    {error, Reason} ->
+      error_503(Reason);
+    {ok, PartitionsCnt} ->
+      Partitions = gen_random_list(0, PartitionsCnt - 1),
+      produce_to_random_partition(Topic, Key, Value, Partitions, undefined)
+  end.
+
+-spec produce_to_random_partition(
+        topic(), key(), value(), [partition()],
+        {error, http_code(), binary()}) ->
+            ok | {error, http_code(), binary()}.
+produce_to_random_partition(_Topic, _Key, _Value, [], LastError) ->
+  LastError;
+produce_to_random_partition(Topic, Key, Value, [P | Partitions], _LastError) ->
   case produce(Topic, P, Key, Value) of
-    {error, 503, <<"infrastructure down">>} = Error ->
-      try_partitions(Topic, Partitions, Key, Value, Error);
+    {error, 503, _Detail} = Error ->
+      produce_to_random_partition(Topic, Key, Value, Partitions, Error);
     {error, _, _} = Error ->
       Error;
     ok ->
@@ -256,17 +260,24 @@ produce(Topic, Partition, Key, Value) ->
       {error, 404, <<"topic not found">>};
     {error, {producer_not_found, _Topic, _Partition}} ->
       {error, 404, <<"partition not found">>};
-    {error, _} -> % client_down or producer_down
-      {error, 503, <<"infrastructure down">>};
+    {error, Reason} ->
+      % client_down or producer_down
+      % socket_down timeout
+      % all kinds of error codes from kafka
+      error_503(Reason);
     ok ->
       ok
   end.
 
-get_random_partition(_Topic, PartitionsCnt, _Key, _Value) ->
-  {ok, crypto:rand_uniform(0, PartitionsCnt)}.
+error_503(Reason) ->
+  Ts = os:system_time(),
+  TraceId = io_lib:format("(~p,~p,~w)", [node(), self(), Ts]),
+  lager:log(error, self(), "error_503 ~s: ~p", [TraceId, Reason]),
+  Msg = ["Service Unavailable. TraceID=", TraceId],
+  {error, 503, iolist_to_binary(Msg)}.
 
 gen_random_list(Min, Max) ->
-  L0 = [{crypto:rand_uniform(Min, Max), X} || X <- lists:seq(Min, Max-1)],
+  L0 = [{crypto:rand_uniform(0,1 bsl 32), X} || X <- lists:seq(Min, Max)],
   {_, L} = lists:unzip(lists:keysort(1, L0)),
   L.
 
