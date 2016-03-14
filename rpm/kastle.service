@@ -1,0 +1,14 @@
+[Unit]
+Description=Apache Kafka REST Proxy
+After=network.target
+
+[Service]
+User=kastle
+Group=kastle
+Restart=on-failure
+EnvironmentFile=/etc/sysconfig/kastle
+ExecStart=/opt/kastle/bin/kastle foreground
+ExecStop=/opt/kastle/bin/kastle stop
+
+[Install]
+WantedBy=multi-user.target

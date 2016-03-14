@@ -5,12 +5,12 @@
    , { colored, true }
    , { handlers
      , [ { lager_console_backend, info }
-       , { lager_file_backend, [ {file, "error.log"},  {level, error}]}
-       , { lager_file_backend, [ {file, "warn.log"},   {level, warning}]}
-       , { lager_file_backend, [ {file, "info.log"},   {level, info}]}
+       , { lager_file_backend, [ {file, "error.log"},  {level, '>=error'}]}
+       , { lager_file_backend, [ {file, "warn.log"},   {level, '=warning'}]}
+       , { lager_file_backend, [ {file, "info.log"},   {level, '=info'}]}
        %% This backend should only be used for development,
        %% remove it for production.
-       , { lager_file_backend, [ {file, "debug.log"},  {level, debug}]}
+       %, { lager_file_backend, [ {file, "debug.log"},  {level, debug}]}
        ]
      }
    ]}
