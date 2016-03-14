@@ -36,9 +36,9 @@ mkdir -p $RPM_BUILD_ROOT%{_unitdir}
 mkdir -p $RPM_BUILD_ROOT%{_conf_dir}
 cp -r _rel/kastle %{buildroot}%{_prefix}/
 install -p -D -m 0644 rpm/%{_service}.service %{buildroot}%{_unitdir}/%{_service}.service
+erl -noshell -eval '{ok, [Config0]} = file:consult("rel/sys.config"), LagerConfig0 = proplists:get_value(lager, Config0, []), LagerConfig = lists:keystore(log_root, 1, LagerConfig0, {log_root, "%{_log_dir}"}), Config = lists:keystore(lager, 1, Config0, {lager, LagerConfig}), file:write_file("rel/sys.config", io_lib:format("~p.~n", [Config])), halt(0).'
 install -p -D -m 0644 rel/sys.config %{buildroot}%{_conf_dir}/sys.config
 install -p -D -m 0644 rel/vm.args %{buildroot}%{_conf_dir}/vm.args
-sed -i 's/log_root.*$/log_root, \"\/var\/log\/%{_name}\" }/' %{buildroot}%{_conf_dir}/sys.config
 
 %clean
 rm -rf $RPM_BUILD_ROOT
