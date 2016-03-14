@@ -37,6 +37,8 @@ mkdir -p %{buildroot}%{_conf_dir}
 mkdir -p %{buildroot}%{_sysconfdir}/sysconfig
 mkdir -p %{buildroot}/usr/local/bin
 cp -r _rel/%{_name}  %{buildroot}%{_prefix}/
+%{__install} -p -D -m 0644 rpm/update_endpoints.erl %{buildroot}%{_prefix}/%{_name}/
+%{__install} -p -D -m 0755 rpm/update-endpoints %{buildroot}%{_prefix}/%{_name}/
 %{__install} -p -D -m 0644 rpm/kastle.service %{buildroot}%{_unitdir}/%{_service}.service
 cat > rewrite_sys_config.erl <<EOF
 -module(rewrite_sys_config).
@@ -101,7 +103,7 @@ fi
 
 %files
 %defattr(-,root,root)
-%{_prefix}/%{_service}
+%{_prefix}/%{_name}
 %attr(0755,root,root) /usr/local/bin/%{_service}
 %{_unitdir}/%{_service}.service
 %config(noreplace) %{_conf_dir}/*
