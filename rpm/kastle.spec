@@ -3,8 +3,8 @@
 %define _user         %{_name}
 %define _group        %{_name}
 %define _prefix      /opt
-%define _conf_dir    %{_sysconfdir}/%{_name}
-%define _log_dir     /var/log/%{_name}
+%define _conf_dir    %{_sysconfdir}/%{_service}
+%define _log_dir     /var/log/%{_service}
 
 Summary: %{_description}
 Name: %{_name}
@@ -18,7 +18,7 @@ Prefix: %{_conf_dir}
 Prefix: %{_log_dir}
 Vendor: Klarna AB
 Packager: Ivan Dyachkov <ivan.dyachkov@klarna.com>
-Provides: %{_name}
+Provides: %{_service}
 BuildRequires: systemd
 %systemd_requires
 
@@ -30,15 +30,29 @@ BuildRequires: systemd
 %build
 
 %install
-mkdir -p $RPM_BUILD_ROOT%{_prefix}
-mkdir -p $RPM_BUILD_ROOT%{_log_dir}
-mkdir -p $RPM_BUILD_ROOT%{_unitdir}
-mkdir -p $RPM_BUILD_ROOT%{_conf_dir}
-cp -r _rel/kastle %{buildroot}%{_prefix}/
-install -p -D -m 0644 rpm/%{_service}.service %{buildroot}%{_unitdir}/%{_service}.service
+mkdir -p %{buildroot}%{_prefix}
+mkdir -p %{buildroot}%{_log_dir}
+mkdir -p %{buildroot}%{_unitdir}
+mkdir -p %{buildroot}%{_conf_dir}
+mkdir -p %{buildroot}%{_sysconfdir}/sysconfig
+mkdir -p %{buildroot}/usr/local/bin
+cp -r _rel/%{_name}  %{buildroot}%{_prefix}/
+%{__install} -p -D -m 0644 rpm/kastle.service %{buildroot}%{_unitdir}/%{_service}.service
 erl -noshell -eval '{ok, [Config0]} = file:consult("rel/sys.config"), LagerConfig0 = proplists:get_value(lager, Config0, []), LagerConfig = lists:keystore(log_root, 1, LagerConfig0, {log_root, "%{_log_dir}"}), Config = lists:keystore(lager, 1, Config0, {lager, LagerConfig}), file:write_file("rel/sys.config", io_lib:format("~p.~n", [Config])), halt(0).'
-install -p -D -m 0644 rel/sys.config %{buildroot}%{_conf_dir}/sys.config
-install -p -D -m 0644 rel/vm.args %{buildroot}%{_conf_dir}/vm.args
+%{__install} -p -D -m 0644 rel/sys.config %{buildroot}%{_conf_dir}/sys.config
+%{__install} -p -D -m 0644 rel/vm.args %{buildroot}%{_conf_dir}/vm.args
+
+cat > %{buildroot}%{_sysconfdir}/sysconfig/%{_service} <<EOF
+RUNNER_LOG_DIR=%{_log_dir}
+RELX_CONFIG_PATH=%{_sysconfdir}/%{_service}/sys.config
+VMARGS_PATH=%{_sysconfdir}/%{_service}/vm.args
+EOF
+
+cat > %{buildroot}/usr/local/bin/%{_service} <<EOF
+#!/bin/sh
+source %{_sysconfdir}/sysconfig/%{_service}
+%{_prefix}/%{_service}/bin/%{_service} \$@
+EOF
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -63,7 +77,9 @@ fi
 
 %files
 %defattr(-,root,root)
-%{_prefix}/%{_name}
+%{_prefix}/%{_service}
+%attr(0755,root,root) /usr/local/bin/%{_service}
 %{_unitdir}/%{_service}.service
 %config(noreplace) %{_conf_dir}/*
+%config(noreplace) %{_sysconfdir}/sysconfig/%{_service}
 %attr(0755,%{_user},%{_group}) %dir %{_log_dir}
