@@ -1,4 +1,6 @@
--module(update_kastle_endpoints).
+-module(update_endpoints).
+-mode(compile).
+-compile(debug_info).
 
 main([HostsStr, SysConfigPath]) ->
   Endpoints = [{Host, 9092} || Host <- string:tokens(HostsStr, ",")],
