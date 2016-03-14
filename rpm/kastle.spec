@@ -38,7 +38,31 @@ mkdir -p %{buildroot}%{_sysconfdir}/sysconfig
 mkdir -p %{buildroot}/usr/local/bin
 cp -r _rel/%{_name}  %{buildroot}%{_prefix}/
 %{__install} -p -D -m 0644 rpm/kastle.service %{buildroot}%{_unitdir}/%{_service}.service
-erl -noshell -eval '{ok, [Config0]} = file:consult("rel/sys.config"), LagerConfig0 = proplists:get_value(lager, Config0, []), LagerConfig1 = lists:keystore(log_root, 1, LagerConfig0, {log_root, "%{_log_dir}"}), LagerConfig = lists:keystore(handlers, 1, LagerConfig1, {handlers, [{lager_console_backend,error},{lager_file_backend,[{file,"error.log"},{level,error},{size, 10485760}, {date, "$W0D23"}, {count, 5}]}]}), Config1 = lists:keystore(lager, 1, Config0, {lager, LagerConfig}), KastleConfig0 = proplists:get_value(kastle, Config1, []), KastleConfig = lists:keystore(listeners, 1, KastleConfig0, {listeners, 64}), Config = lists:keystore(kastle, 1, Config1, {kastle, KastleConfig}), file:write_file("rel/sys.config", io_lib:format("~p.~n", [Config])), {ok, _} = file:consult("rel/sys.config"), halt(0).'
+cat > rewrite_sys_config.erl <<EOF
+-module(rewrite_sys_config).
+main(_) ->
+  {ok, [Config0]} = file:consult("rel/sys.config"),
+  LagerConfig0 = proplists:get_value(lager, Config0, []),
+  LagerConfig1 = lists:keystore(log_root, 1, LagerConfig0, {log_root, "%{_log_dir}"}),
+  LagerConsoleBackend = {lager_console_backend,error},
+  LagerFileBackend = {lager_file_backend,[ {file, "error.log"}
+                                         , {level, error}
+                                         , {size, 10485760}
+                                         , {date, "$W0D23"}
+                                         , {count, 5}]},
+  Handlers = [LagerConsoleBackend, LagerFileBackend],
+  LagerConfig = lists:keystore(handlers, 1, LagerConfig1, {handlers, Handlers}),
+  Config1 = lists:keystore(lager, 1, Config0, {lager, LagerConfig}),
+  KastleConfig0 = proplists:get_value(kastle, Config1, []),
+  KastleConfig = lists:keystore(listeners, 1, KastleConfig0, {listeners, 64}),
+  Config = lists:keystore(kastle, 1, Config1, {kastle, KastleConfig}),
+  file:write_file("rel/sys.config", io_lib:format("~p.~n", [Config])),
+  {ok, _} = file:consult("rel/sys.config"),
+  ok.
+
+EOF
+escript rewrite_sys_config.erl
+rm -f rewrite_sys_config.erl
 %{__install} -p -D -m 0644 rel/sys.config %{buildroot}%{_conf_dir}/sys.config
 %{__install} -p -D -m 0644 rel/vm.args %{buildroot}%{_conf_dir}/vm.args
 
