@@ -17,6 +17,8 @@
 -ifndef(__KASTLE_HRL).
 -define(__KASTLE_HRL, true).
 
+-include_lib("lager/include/lager.hrl").
+
 -define(KASTLE_JSON_SCHEMA, kastle_json_schema).
 
 -define(MESSAGE_KEY, <<"key">>).

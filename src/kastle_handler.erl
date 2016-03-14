@@ -49,6 +49,12 @@
 
 -define(KAFKA_KEY_HEADER, <<"kafka-key">>).
 
+-type key() :: binary().
+-type value() :: binary().
+-type topic() :: binary().
+-type partition() :: non_neg_integer().
+-type http_code() :: pos_integer().
+
 %%_* cowboy handler callbacks ==================================================
 
 -spec init({atom(), atom()}, cowboy_req:req(), _) ->
@@ -92,16 +98,16 @@ handle_json(Req0, State) ->
   {ok, Body, Req3} = cowboy_req:body(Req2),
   {ok, Req} =
     case do_handle_json(Topic,
-                        validate_partition(Partition),
-                        validate_body(Body)) of
+                        parse_partition(Partition),
+                        parse_body(Body)) of
       ok ->
-        log_info(Req3, 204),
+        server_log(info, Req3, 204),
         cowboy_req:reply(204, Req3);
       {error, Error} ->
-        log_error(Req3, 400, Error),
+        server_log(error, Req3, 400, "error: ~p", [Error]),
         cowboy_req:reply(400, [], jiffy:encode(#{error => Error}), Req3);
       {error, Code, Error} ->
-        log_error(Req3, Code, Error),
+        server_log(error, Req3, Code, "error: ~p", [Error]),
         cowboy_req:reply(Code, [], jiffy:encode(#{error => Error}), Req3)
     end,
   {halt, Req, State}.
@@ -114,50 +120,68 @@ handle_binary(Req0, State) ->
   {Key, Req3} = cowboy_req:header(?KAFKA_KEY_HEADER, Req2, <<>>),
   {ok, Value, Req4} = cowboy_req:body(Req3),
   {ok, Req} =
-    case do_handle_binary(Topic, validate_partition(Partition), Key, Value) of
+    case do_handle_binary(Topic, parse_partition(Partition), Key, Value) of
       ok ->
-        log_info(Req4, 204),
+        server_log(info, Req4, 204),
         cowboy_req:reply(204, Req4);
       {error, Error} ->
-        log_error(Req4, 400, Error),
+        server_log(error, Req4, 400, "error: ~p", [Error]),
         cowboy_req:reply(400, [], jiffy:encode(#{error => Error}), Req4);
       {error, Code, Error} ->
-        log_error(Req4, Code, Error),
+        server_log(error, Req4, Code, "error: ~p", [Error]),
         cowboy_req:reply(Code, [], jiffy:encode(#{error => Error}), Req4)
     end,
   {halt, Req, State}.
 
 %%_* Internal functions ========================================================
-log_error(Req, ResponseCode, Error) ->
-  do_log(error, Req, ResponseCode, ", error: ~p", [Error]).
+server_log(Level, Req, ResponseCode) ->
+  server_log(Level, Req, ResponseCode, "", []).
 
-log_info(Req, ResponseCode) ->
-  do_log(info, Req, ResponseCode).
+server_log(Level, Req, ResponseCode, ExtraFmt, ExtraArgs) ->
+  Format = get_server_log_fmt_fun(ExtraFmt),
+  Args = get_server_log_fmt_args_fun(Req, ResponseCode, ExtraArgs),
+  do_log(Level, Format, Args).
 
-do_log(Level, Req, ResponseCode) ->
-  do_log(Level, Req, ResponseCode, "", []).
+do_log(Level, Format, Args) when is_list(Args) ->
+  lager:log(Level, self(), Format, Args);
+do_log(Level, Format, Args) when is_function(Format), is_function(Args) ->
+  case should_log_or_trace(Level) of
+    true ->
+      lager:log(Level, self(), Format(), Args());
+    false ->
+      ok
+  end.
 
-do_log(Level, Req, ResponseCode, ExtraFmt, ExtraArgs) ->
-  {Method, _} = cowboy_req:method(Req),
-  {Path, _} = cowboy_req:path(Req),
-  {Version, _} = cowboy_req:version(Req),
-  {UserAgent, _} = cowboy_req:header(<<"user-agent">>, Req),
-  {Host, _} = cowboy_req:header(<<"host">>, Req),
-  {ContentType, _} = cowboy_req:header(<<"content-type">>, Req),
-  {ContentLength, _} = cowboy_req:header(<<"content-length">>, Req),
-  Format = "~s ~s ~s ~B, user-agent: ~s, host: ~s, content-type: ~s, content-length: ~s" ++ ExtraFmt,
-  Args = [Method, Path, Version, ResponseCode, UserAgent, Host, ContentType, ContentLength] ++ ExtraArgs,
-  lager:log(Level, self(), Format, Args).
+should_log_or_trace(Level) ->
+  {CurrentLevel, Traces} = lager_config:get(loglevel, {?LOG_NONE, []}),
+  (lager_util:level_to_num(Level) band CurrentLevel) /= 0 orelse Traces /= [].
 
-validate_partition(Partition) ->
-  string:to_integer(binary_to_list(Partition)).
+get_server_log_fmt_fun(ExtraFmt) ->
+  fun() -> "~s ~s ~s ~B, user-agent: ~s, host: ~s, content-type: ~s, content-length: ~s, " ++ ExtraFmt end.
 
-validate_body(Body) ->
-  do_validate_body(catch jiffy:decode(Body, [return_maps])).
+get_server_log_fmt_args_fun(Req, ResponseCode, ExtraArgs) ->
+  fun() ->
+      {Method, _} = cowboy_req:method(Req),
+      {Path, _} = cowboy_req:path(Req),
+      {Version, _} = cowboy_req:version(Req),
+      {UserAgent, _} = cowboy_req:header(<<"user-agent">>, Req),
+      {Host, _} = cowboy_req:header(<<"host">>, Req),
+      {ContentType, _} = cowboy_req:header(<<"content-type">>, Req),
+      {ContentLength, _} = cowboy_req:header(<<"content-length">>, Req),
+      [Method, Path, Version, ResponseCode, UserAgent, Host, ContentType, ContentLength] ++ ExtraArgs
+  end.
 
-do_validate_body({error, _Whatever}) ->
+parse_partition(Partition) when is_binary(Partition) ->
+  string:to_integer(binary_to_list(Partition));
+parse_partition(Partition) ->
+  Partition.
+
+parse_body(Body) ->
+  do_parse_body(catch jiffy:decode(Body, [return_maps])).
+
+do_parse_body({error, _Whatever}) ->
   {error, <<"invalid json">>};
-do_validate_body(Data) ->
+do_parse_body(Data) ->
   case jesse:validate(?KASTLE_JSON_SCHEMA, Data) of
     {ok, _} = Res ->
       Res;
@@ -181,47 +205,81 @@ do_handle_json(_Topic, _Partition, {error, _Code, _Any} = Error) ->
   Error;
 do_handle_json(_Topic, {error, no_integer}, _Data) ->
   {error, <<"invalid partition">>};
+do_handle_json(Topic, undefined, {ok, Data}) ->
+  Key = maps:get(?MESSAGE_KEY, Data),
+  Value = maps:get(?MESSAGE_VALUE, Data),
+  produce_to_random_partition(Topic, Key, Value);
 do_handle_json(Topic, {Partition, []}, {ok, Data}) when is_integer(Partition) ->
   Key = maps:get(?MESSAGE_KEY, Data),
   Value = maps:get(?MESSAGE_VALUE, Data),
-  produce(Topic, Partition, [{Key, Value}]).
+  produce(Topic, Partition, Key, Value).
 
+do_handle_binary(Topic, undefined, Key, Value) ->
+  produce_to_random_partition(Topic, Key, Value);
 do_handle_binary(_Topic, {error, no_integer}, _Key, _Value) ->
   {error, <<"invalid partition">>};
 do_handle_binary(Topic, {Partition, []}, Key, Value) when is_integer(Partition) ->
-  produce(Topic, Partition, [{Key, Value}]).
+  produce(Topic, Partition, Key, Value).
 
-produce(Topic, Partition, [{Key, Value}]) ->
-  case get_producer(Topic, Partition) of
+-spec produce_to_random_partition(topic(), binary(), binary()) ->
+        ok | {error, http_code(), iodata()}.
+produce_to_random_partition(Topic, Key, Value) ->
+  %% try all available partitions
+  case brod_client:get_partitions_count(?BROD_CLIENT, Topic) of
+    {error, 'UnknownTopicOrPartition'} ->
+      {error, 404, <<"topic not found">>};
+    {error, Reason} ->
+      error_503(Reason);
+    {ok, PartitionsCnt} ->
+      Partitions = gen_random_list(0, PartitionsCnt - 1),
+      produce_to_random_partition(Topic, Key, Value, Partitions, undefined)
+  end.
+
+-spec produce_to_random_partition(
+        topic(), key(), value(), [partition()],
+        {error, http_code(), binary()}) ->
+            ok | {error, http_code(), binary()}.
+produce_to_random_partition(_Topic, _Key, _Value, [], LastError) ->
+  LastError;
+produce_to_random_partition(Topic, Key, Value, [P | Partitions], _LastError) ->
+  case produce(Topic, P, Key, Value) of
+    {error, 503, _Detail} = Error ->
+      produce_to_random_partition(Topic, Key, Value, Partitions, Error);
+    {error, _, _} = Error ->
+      Error;
+    ok ->
+      ok
+  end.
+
+produce(Topic, Partition, Key, Value) ->
+  Res = brod:produce_sync(?BROD_CLIENT, Topic, Partition, Key, Value),
+  case Res of
     {error, topic_not_found} ->
       {error, 404, <<"topic not found">>};
     {error, {producer_not_found, _Topic}} ->
       {error, 404, <<"topic not found">>};
     {error, {producer_not_found, _Topic, _Partition}} ->
       {error, 404, <<"partition not found">>};
-    {error, _} -> % client_down or producer_down
-      {error, 503, <<"infrastructure down">>};
-    {ok, Producer} ->
-      brod:produce_sync(Producer, Key, Value)
-  end.
-
-get_producer(Topic, Partition) ->
-  case brod:get_producer(?BROD_CLIENT, Topic, Partition) of
-    {error, _Any} ->
-      try_start_producer(Topic, Partition);
-    {ok, Producer} ->
-      {ok, Producer}
-  end.
-
-try_start_producer(Topic, Partition) ->
-  case brod:start_producer(?BROD_CLIENT, Topic, kastle:get_producer_config()) of
-    {error, topic_not_found} = Error ->
-      Error;
-    {error, {already_started, _}} -> % may be by another request?
-      brod:get_producer(?BROD_CLIENT, Topic, Partition);
+    {error, Reason} ->
+      % client_down or producer_down
+      % socket_down timeout
+      % all kinds of error codes from kafka
+      error_503(Reason);
     ok ->
-      brod:get_producer(?BROD_CLIENT, Topic, Partition)
+      ok
   end.
+
+error_503(Reason) ->
+  Ts = os:system_time(),
+  TraceId = io_lib:format("(~p,~p,~w)", [node(), self(), Ts]),
+  lager:log(error, self(), "error_503 ~s: ~p", [TraceId, Reason]),
+  Msg = ["Service Unavailable. TraceID=", TraceId],
+  {error, 503, iolist_to_binary(Msg)}.
+
+gen_random_list(Min, Max) ->
+  L0 = [{crypto:rand_uniform(0,1 bsl 32), X} || X <- lists:seq(Min, Max)],
+  {_, L} = lists:unzip(lists:keysort(1, L0)),
+  L.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
