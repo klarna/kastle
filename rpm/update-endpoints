@@ -1,0 +1,5 @@
+#!/bin/sh
+
+SCRIPT_DIR=$(dirname $0)
+ESCRIPT=$(find ${SCRIPT_DIR} -name escript | head -n 1)
+${ESCRIPT} ${SCRIPT_DIR}/update_endpoints.erl $@
