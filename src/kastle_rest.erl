@@ -77,8 +77,8 @@ init([]) ->
   Protocol = [{env, [{dispatch, cowboy_router:compile([Host])}]}],
   Acceptors = kastle:getenv(acceptors, ?DEFAULT_ACCEPTORS),
 
-  {HttpsStarted, HttpsListener} = start_https(Acceptors, SslTransport, Protocol),
-  {_, HttpListener} = start_http(Acceptors, TcpPort, Protocol, HttpsStarted),
+  HttpsListener = start_https(Acceptors, SslTransport, Protocol),
+  HttpListener = start_http(Acceptors, TcpPort, Protocol, HttpsListener),
 
   {ok, #state{listeners = [L || L <- [HttpListener, HttpsListener], L =/= null]}}.
 
@@ -101,25 +101,28 @@ code_change(_OldVsn, State, _Extra) ->
 %%_* Internal functions ========================================================
 
 start_https(_, no_ssl, _) ->
-  {not_started, null};
+  null;
 start_https(Acceptors, SslTransport, Protocol) ->
   Listener = make_ref(),
   lager:info("~p HTTPS listener is using port ~p", [?APPLICATION, proplists:get_value(port, SslTransport)]),
-  {cowboy:start_https(Listener, Acceptors, SslTransport, Protocol), Listener}.
+  {ok, _} = cowboy:start_https(Listener, Acceptors, SslTransport, Protocol),
+  Listener.
 
-start_http(Acceptors, no_tcp_port, Protocol, not_started) ->
+start_http(Acceptors, no_tcp_port, Protocol, null) ->
   Listener = make_ref(),
   %% HTTPS listener not started and no TCP port configured:
   %% then start the TCP on the default port
   Transport = [{port, ?DEFAULT_PORT}],
   lager:info("~p HTTP listener is using default port ~p", [?APPLICATION, ?DEFAULT_PORT]),
-  {cowboy:start_http(Listener, Acceptors, Transport, Protocol), Listener};
+  {ok, _} = cowboy:start_http(Listener, Acceptors, Transport, Protocol),
+  Listener;
 start_http(_, no_tcp_port, _, _) ->
-  {not_started, null};
+  null;
 start_http(Acceptors, TcpPort, Protocol, _) ->
   Listener = make_ref(),
   lager:info("~p HTTP listener is using port ~p", [?APPLICATION, TcpPort]),
-  {cowboy:start_http(Listener, Acceptors, [{port, TcpPort}], Protocol), Listener}.
+  {ok, _} = cowboy:start_http(Listener, Acceptors, [{port, TcpPort}], Protocol),
+  Listener.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
