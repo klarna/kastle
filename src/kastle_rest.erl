@@ -80,7 +80,7 @@ init([]) ->
   {HttpsStarted, HttpsListener} = start_https(Acceptors, SslTransport, Protocol),
   {_, HttpListener} = start_http(Acceptors, TcpPort, Protocol, HttpsStarted),
 
-  {ok, #state{listeners = [HttpListener, HttpsListener]}}.
+  {ok, #state{listeners = [L || L <- [HttpListener, HttpsListener], L =/= null]}}.
 
 handle_call(_Request, _From, State) ->
   {reply, ok, State}.
