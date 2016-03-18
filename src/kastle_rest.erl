@@ -65,8 +65,6 @@ init([]) ->
                                      <<"required">> => true}}},
   jesse:add_schema(?KASTLE_JSON_SCHEMA, Schema),
 
-  SslTransport = kastle:getenv(ssl_transport, no_ssl),
-  TcpPort = kastle:getenv(port, no_tcp_port),
   Host =
     { '_'
       , [ {<<"/rest/kafka/v0/:topic/:partition">>, [], kastle_handler, no_opts}
@@ -77,8 +75,10 @@ init([]) ->
   Protocol = [{env, [{dispatch, cowboy_router:compile([Host])}]}],
   Acceptors = kastle:getenv(acceptors, ?DEFAULT_ACCEPTORS),
 
+  HttpPort = kastle:getenv(port, ?DEFAULT_PORT),
+  HttpListener = start_http(Acceptors, HttpPort, Protocol),
+  SslTransport = kastle:getenv(ssl, no_ssl),
   HttpsListener = start_https(Acceptors, SslTransport, Protocol),
-  HttpListener = start_http(Acceptors, TcpPort, Protocol, HttpsListener),
 
   {ok, #state{listeners = [L || L <- [HttpListener, HttpsListener], L =/= null]}}.
 
@@ -104,24 +104,15 @@ start_https(_, no_ssl, _) ->
   null;
 start_https(Acceptors, SslTransport, Protocol) ->
   Listener = make_ref(),
-  lager:info("~p HTTPS listener is using port ~p", [?APPLICATION, proplists:get_value(port, SslTransport)]),
+  lager:info("~p HTTPS listener is using port ~p",
+             [?APPLICATION, proplists:get_value(port, SslTransport)]),
   {ok, _} = cowboy:start_https(Listener, Acceptors, SslTransport, Protocol),
   Listener.
 
-start_http(Acceptors, no_tcp_port, Protocol, null) ->
+start_http(Acceptors, HttpPort, Protocol) ->
   Listener = make_ref(),
-  %% HTTPS listener not started and no TCP port configured:
-  %% then start the TCP on the default port
-  Transport = [{port, ?DEFAULT_PORT}],
-  lager:info("~p HTTP listener is using default port ~p", [?APPLICATION, ?DEFAULT_PORT]),
-  {ok, _} = cowboy:start_http(Listener, Acceptors, Transport, Protocol),
-  Listener;
-start_http(_, no_tcp_port, _, _) ->
-  null;
-start_http(Acceptors, TcpPort, Protocol, _) ->
-  Listener = make_ref(),
-  lager:info("~p HTTP listener is using port ~p", [?APPLICATION, TcpPort]),
-  {ok, _} = cowboy:start_http(Listener, Acceptors, [{port, TcpPort}], Protocol),
+  lager:info("~p HTTP listener is using port ~p", [?APPLICATION, HttpPort]),
+  {ok, _} = cowboy:start_http(Listener, Acceptors, [{port, HttpPort}], Protocol),
   Listener.
 
 %%%_* Emacs ====================================================================

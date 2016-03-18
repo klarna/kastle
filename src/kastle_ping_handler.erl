@@ -38,6 +38,8 @@
 -spec init({atom(), atom()}, cowboy_req:req(), any()) ->
               {ok, cowboy_req:req(), any()}.
 init({tcp, http}, Req, Opts) ->
+  {ok, Req, Opts};
+init({ssl, http}, Req, Opts) ->
   {ok, Req, Opts}.
 
 handle(Req0, State) ->
