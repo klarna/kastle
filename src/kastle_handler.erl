@@ -60,6 +60,8 @@
 -spec init({atom(), atom()}, cowboy_req:req(), _) ->
               {upgrade, protocol, cowboy_rest}.
 init({tcp, http}, _, _) ->
+  {upgrade, protocol, cowboy_rest};
+init({ssl, http}, _, _) ->
   {upgrade, protocol, cowboy_rest}.
 
 %%_* cowboy rest callbacks =====================================================
