@@ -66,7 +66,7 @@ maybe_update_env() ->
   ok = maybe_set_kastle_param(?KASTLE_HTTP_LISTENERS, http, listeners, ?l2i),
 
   ok = maybe_set_kastle_param(?KASTLE_ENABLE_SSL, root, ssl_enabled, ?l2a),
-  case application:get_env(kastle, ssl_enabled) of
+  case application:get_env(?APPLICATION, ssl_enabled) of
     {ok, true} ->
       ok = maybe_set_kastle_param(?KASTLE_SSL_PORT, ssl, port, ?l2i),
       ok = maybe_set_kastle_param(?KASTLE_SSL_LISTENERS, ssl, listeners, ?l2i),
@@ -100,11 +100,11 @@ maybe_set_kastle_param(EnvVarName, Section, Param, ConvertFun) ->
   end.
 
 set_kastle_env(root, Param, Value) ->
-  application:set_env(kastle, Param, Value);
+  application:set_env(?APPLICATION, Param, Value);
 set_kastle_env(Section, Param, Value) ->
   SectionConfig0 = application:get_env(kastle, Section),
   SectionConfig = lists:keystore(Param, 1, SectionConfig0, {Param, Value}),
-  application:set_env(kastle, Section, SectionConfig).
+  application:set_env(?APPLICATION, Section, SectionConfig).
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
