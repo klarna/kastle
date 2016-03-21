@@ -36,8 +36,10 @@
       ]
      }
    ]}
-, { kastle, [ {port, 8092}
-            , {listeners, 4}
+, { kastle, [ {http, [ {port, 8092}
+                     , {listeners, 4}
+                     ]}
+            , {ssl_enabled, false}
             , {ssl, [ {port, 8093}
                     , {certfile, "/etc/ssl/certs/localhost.crt"}
                     , {cacertfile, "/etc/ssl/certs/ca-bundle.crt"}
