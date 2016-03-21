@@ -51,6 +51,7 @@ stop(_State) ->
 -define(KASTLE_SSL_CACERTFILE, "KASTLE_SSL_CACERTFILE").
 -define(KASTLE_SSL_CERTFILE, "KASTLE_SSL_CERTFILE").
 -define(KASTLE_SSL_KEYFILE, "KASTLE_SSL_KEYILE").
+-define(KASTLE_SSL_CIPHERS, "KASTLE_SSL_CIPHERS").
 -define(KASTLE_SSL_VERIFY, "KASTLE_SSL_VERIFY").
 -define(KASTLE_SSL_FAIL_IF_NO_PEER_CERT, "KASTLE_SSL_FAIL_IF_NO_PEER_CERT").
 
@@ -68,11 +69,13 @@ maybe_update_env() ->
   ok = maybe_set_kastle_param(?KASTLE_ENABLE_SSL, root, ssl_enabled, ?l2a),
   case application:get_env(?APPLICATION, ssl_enabled) of
     {ok, true} ->
+      ParseCsl = fun(X) -> string:tokens(X, ",") end,
       ok = maybe_set_kastle_param(?KASTLE_SSL_PORT, ssl, port, ?l2i),
       ok = maybe_set_kastle_param(?KASTLE_SSL_LISTENERS, ssl, listeners, ?l2i),
       ok = maybe_set_kastle_param(?KASTLE_SSL_CACERTFILE, ssl, cacertfile, ?l2l),
       ok = maybe_set_kastle_param(?KASTLE_SSL_CERTFILE, ssl, certfile, ?l2l),
       ok = maybe_set_kastle_param(?KASTLE_SSL_KEYFILE, ssl, keyfile, ?l2l),
+      ok = maybe_set_kastle_param(?KASTLE_SSL_CIPHERS, ssl, ciphers, ParseCsl),
       ok = maybe_set_kastle_param(?KASTLE_SSL_VERIFY, ssl, verify, ?l2a),
       ok = maybe_set_kastle_param(?KASTLE_SSL_FAIL_IF_NO_PEER_CERT, ssl,
                                   fail_if_no_peer_cert, ?l2a);
