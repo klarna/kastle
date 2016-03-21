@@ -85,7 +85,7 @@ maybe_set_kafka_endpoints(false) ->
   ok;
 maybe_set_kafka_endpoints(HostsStr) when is_list(HostsStr) ->
   Endpoints = [{Host, 9092} || Host <- string:tokens(HostsStr, ",")],
-  BrodClients0 = application:get_env(brod, clients),
+  {ok, BrodClients0} = application:get_env(brod, clients),
   ClientConfig0 = proplists:get_value(?BROD_CLIENT, BrodClients0),
   ClientConfig = lists:keystore(endpoints, 1, ClientConfig0, {endpoints, Endpoints}),
   BrodClients = lists:keystore(kastle_kafka_client, 1,
@@ -102,7 +102,7 @@ maybe_set_kastle_param(EnvVarName, Section, Param, ConvertFun) ->
 set_kastle_env(root, Param, Value) ->
   application:set_env(?APPLICATION, Param, Value);
 set_kastle_env(Section, Param, Value) ->
-  SectionConfig0 = application:get_env(kastle, Section),
+  {ok, SectionConfig0} = application:get_env(kastle, Section),
   SectionConfig = lists:keystore(Param, 1, SectionConfig0, {Param, Value}),
   application:set_env(?APPLICATION, Section, SectionConfig).
 
