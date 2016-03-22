@@ -26,7 +26,6 @@
         , stop/0
         , getenv/1
         , getenv/2
-        , get_producer_config/0
         ]).
 
 %%%_* API ======================================================================
@@ -51,9 +50,6 @@ getenv(Name, Default) ->
   catch throw : {noenv, Name} ->
     Default
   end.
-
-get_producer_config() ->
-  getenv(producer_config, []).
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

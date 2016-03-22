@@ -73,12 +73,11 @@ init([]) ->
         ]
     },
   Protocol = [{env, [{dispatch, cowboy_router:compile([Host])}]}],
-  Acceptors = kastle:getenv(acceptors, ?DEFAULT_ACCEPTORS),
 
-  HttpPort = kastle:getenv(port, ?DEFAULT_PORT),
-  HttpListener = start_http(Acceptors, HttpPort, Protocol),
-  SslTransport = kastle:getenv(ssl, no_ssl),
-  HttpsListener = start_https(Acceptors, SslTransport, Protocol),
+  HttpListener = start_http(Protocol),
+
+  SslEnabled = kastle:getenv(ssl_enabled, false),
+  HttpsListener = maybe_start_https(SslEnabled, Protocol),
 
   {ok, #state{listeners = [L || L <- [HttpListener, HttpsListener], L =/= null]}}.
 
@@ -100,19 +99,24 @@ code_change(_OldVsn, State, _Extra) ->
 
 %%_* Internal functions ========================================================
 
-start_https(_, no_ssl, _) ->
-  null;
-start_https(Acceptors, SslTransport, Protocol) ->
+start_http(Protocol) ->
+  HttpConfig = kastle:getenv(http, []),
+  Port = proplists:get_value(port, HttpConfig, ?DEFAULT_PORT),
+  Acceptors = proplists:get_value(acceptors, HttpConfig, ?DEFAULT_ACCEPTORS),
   Listener = make_ref(),
-  lager:info("~p HTTPS listener is using port ~p",
-             [?APPLICATION, proplists:get_value(port, SslTransport)]),
-  {ok, _} = cowboy:start_https(Listener, Acceptors, SslTransport, Protocol),
+  lager:info("~p HTTP listener is using port ~p", [?APPLICATION, Port]),
+  {ok, _} = cowboy:start_http(Listener, Acceptors, [{port, Port}], Protocol),
   Listener.
 
-start_http(Acceptors, HttpPort, Protocol) ->
+maybe_start_https(false, _Protocol) ->
+  null;
+maybe_start_https(true, Protocol) ->
+  SslConfig = kastle:getenv(ssl),
+  Port = proplists:get_value(port, SslConfig),
+  Acceptors = proplists:get_value(acceptors, SslConfig, ?DEFAULT_ACCEPTORS),
   Listener = make_ref(),
-  lager:info("~p HTTP listener is using port ~p", [?APPLICATION, HttpPort]),
-  {ok, _} = cowboy:start_http(Listener, Acceptors, [{port, HttpPort}], Protocol),
+  lager:info("~p HTTPS listener is using port ~p", [?APPLICATION, Port]),
+  {ok, _} = cowboy:start_https(Listener, Acceptors, SslConfig, Protocol),
   Listener.
 
 %%%_* Emacs ====================================================================
