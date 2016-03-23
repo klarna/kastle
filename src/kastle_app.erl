@@ -50,7 +50,7 @@ stop(_State) ->
 -define(KASTLE_SSL_LISTENERS, "KASTLE_SSL_LISTENERS").
 -define(KASTLE_SSL_CACERTFILE, "KASTLE_SSL_CACERTFILE").
 -define(KASTLE_SSL_CERTFILE, "KASTLE_SSL_CERTFILE").
--define(KASTLE_SSL_KEYFILE, "KASTLE_SSL_KEYILE").
+-define(KASTLE_SSL_KEYFILE, "KASTLE_SSL_KEYFILE").
 -define(KASTLE_SSL_CIPHERS, "KASTLE_SSL_CIPHERS").
 -define(KASTLE_SSL_VERIFY, "KASTLE_SSL_VERIFY").
 -define(KASTLE_SSL_FAIL_IF_NO_PEER_CERT, "KASTLE_SSL_FAIL_IF_NO_PEER_CERT").
@@ -60,8 +60,8 @@ stop(_State) ->
 -define(l2l, fun(X_) -> X_ end).
 
 maybe_update_env() ->
-  KafkaEndpoints = os:getenv(?KASTLE_KAFKA_ENDPOINTS),
-  ok = maybe_set_kafka_endpoints(KafkaEndpoints),
+  ParseKafkaHosts = fun(X) -> [{Host, 9092} || Host <- string:tokens(X, ",")] end,
+  ok = maybe_set_kastle_param(?KASTLE_KAFKA_ENDPOINTS, root, kafka_endpoints, ParseKafkaHosts),
 
   ok = maybe_set_kastle_param(?KASTLE_HTTP_PORT, http, port, ?l2i),
   ok = maybe_set_kastle_param(?KASTLE_HTTP_LISTENERS, http, listeners, ?l2i),
@@ -83,17 +83,6 @@ maybe_update_env() ->
       ok
   end,
   ok.
-
-maybe_set_kafka_endpoints(false) ->
-  ok;
-maybe_set_kafka_endpoints(HostsStr) when is_list(HostsStr) ->
-  Endpoints = [{Host, 9092} || Host <- string:tokens(HostsStr, ",")],
-  {ok, BrodClients0} = application:get_env(brod, clients),
-  ClientConfig0 = proplists:get_value(?BROD_CLIENT, BrodClients0),
-  ClientConfig = lists:keystore(endpoints, 1, ClientConfig0, {endpoints, Endpoints}),
-  BrodClients = lists:keystore(kastle_kafka_client, 1,
-                               BrodClients0, {?BROD_CLIENT, ClientConfig}),
-  application:set_env(brod, clients, BrodClients).
 
 maybe_set_kastle_param(EnvVarName, Section, Param, ConvertFun) ->
   EnvVar = os:getenv(EnvVarName),

@@ -42,7 +42,8 @@
 -include("kastle.hrl").
 
 %%_* Records ===================================================================
--record(state, { listeners :: [reference()] }).
+-record(state, { listeners   :: [reference()]
+               , brod_client :: pid()}).
 
 %%_* Macros ====================================================================
 -define(SERVER, ?MODULE).
@@ -65,6 +66,10 @@ init([]) ->
                                      <<"required">> => true}}},
   jesse:add_schema(?KASTLE_JSON_SCHEMA, Schema),
 
+  {ok, BrodClient} =
+    brod:start_link_client(kastle:getenv(kafka_endpoints),
+                           ?BROD_CLIENT,
+                           kastle:getenv(brod_client_config)),
   Host =
     { '_'
       , [ {<<"/rest/kafka/v0/:topic/:partition">>, [], kastle_handler, no_opts}
@@ -79,19 +84,24 @@ init([]) ->
   SslEnabled = kastle:getenv(ssl_enabled, false),
   HttpsListener = maybe_start_https(SslEnabled, Protocol),
 
-  {ok, #state{listeners = [L || L <- [HttpListener, HttpsListener], L =/= null]}}.
+  Listeners = [L || L <- [HttpListener, HttpsListener], L =/= null],
+  {ok, #state{listeners = Listeners, brod_client = BrodClient}}.
 
-handle_call(_Request, _From, State) ->
-  {reply, ok, State}.
+handle_call(Request, From, State) ->
+  lager:warning("~p ~p got unexpected call: ~p from ~p", [?MODULE, self(), Request, From]),
+  {reply, {error, {bad_call, Request}}, State}.
 
-handle_cast(_Request, State) ->
+handle_cast(Request, State) ->
+  lager:warning("~p ~p got unexpected cast: ~p", [?MODULE, self(), Request]),
   {noreply, State}.
 
-handle_info(_Info, State) ->
+handle_info(Info, State) ->
+  lager:warning("~p ~p got unexpected info: ~p", [?MODULE, self(), Info]),
   {noreply, State}.
 
-terminate(_Reason, #state{listeners = Listeners}) ->
+terminate(_Reason, #state{listeners = Listeners, brod_client = BrodClient}) ->
   [cowboy:stop_listener(L) || L <- Listeners],
+  brod:stop_client(BrodClient),
   ok.
 
 code_change(_OldVsn, State, _Extra) ->
