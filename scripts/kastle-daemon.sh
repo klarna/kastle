@@ -1,5 +1,7 @@
 #!/bin/bash -xe
 
+## Usage kastel-daemon.sh stop | start | console
+
 THIS_DIR="$(dirname $(readlink -f $0))"
 
 KASTLE_HOME="$THIS_DIR/../_rel/kastle"
@@ -11,11 +13,13 @@ if [ "$1" = "stop" ]; then
   exit 0
 fi
 
-REL_CONFIG="$THIS_DIR/../relx.config"
+SYS_CONFIG=/etc/kastle/sys.config
 
-VSN="$(erl -noshell -eval "{ok, RelConf} = file:consult(\"$REL_CONFIG\"), {release,{_,Vsn},_} = hd(RelConf), io:format(Vsn), halt(0)")"
-
-SYS_CONFIG=$KASTLE_HOME/releases/$VSN/sys.config
+if [ ! -f $SYS_CONFIG ]; then
+  REL_CONFIG="$THIS_DIR/../relx.config"
+  VSN="$(erl -noshell -eval "{ok, RelConf} = file:consult(\"$REL_CONFIG\"), {release,{_,Vsn},_} = hd(RelConf), io:format(Vsn), halt(0)")"
+  SYS_CONFIG=$KASTLE_HOME/releases/$VSN/sys.config
+fi
 
 ## copy a sys.config file if it is not found in release dir
 if [ ! -f $SYS_CONFIG ]; then
@@ -23,5 +27,5 @@ if [ ! -f $SYS_CONFIG ]; then
 fi
 
 ## start kastle daemon
-$KASTLE_HOME/bin/kastle start
+$KASTLE_HOME/bin/kastle $1
 
