@@ -53,3 +53,4 @@ rpm: all
 			--define "_description $(PROJECT_DESCRIPTION)" \
 			--define "_version $(PROJECT_VERSION)" \
 			rpm/kastle.spec
+

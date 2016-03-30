@@ -16,3 +16,4 @@ relx
 logs/
 *.beam
 x86_64/
+xrefr
