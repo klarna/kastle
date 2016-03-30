@@ -13,17 +13,18 @@ if [ "$1" = "stop" ]; then
   exit 0
 fi
 
-SYS_CONFIG=/etc/kastle/sys.config
+REL_CONFIG="$THIS_DIR/../relx.config"
+VSN="$(erl -noshell -eval "{ok, RelConf} = file:consult(\"$REL_CONFIG\"), {release,{_,Vsn},_} = hd(RelConf), io:format(Vsn), halt(0)")"
+SYS_CONFIG=$KASTLE_HOME/releases/$VSN/sys.config
 
-if [ ! -f $SYS_CONFIG ]; then
-  REL_CONFIG="$THIS_DIR/../relx.config"
-  VSN="$(erl -noshell -eval "{ok, RelConf} = file:consult(\"$REL_CONFIG\"), {release,{_,Vsn},_} = hd(RelConf), io:format(Vsn), halt(0)")"
-  SYS_CONFIG=$KASTLE_HOME/releases/$VSN/sys.config
+SYS_CONFIG_SRC=/etc/kastle/sys.config
+if [ ! -f $SYS_CONFIG_SRC ]; then
+  SYS_CONFIG_SRC=$THIS_DIR/../rel/sys.config.example
 fi
 
 ## copy a sys.config file if it is not found in release dir
 if [ ! -f $SYS_CONFIG ]; then
-  cp $THIS_DIR/../rel/sys.config.example $SYS_CONFIG
+  cp $SYS_CONFIG_SRC $SYS_CONFIG
 fi
 
 ## start kastle daemon
