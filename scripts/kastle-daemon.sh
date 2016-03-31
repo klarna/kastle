@@ -18,12 +18,9 @@ VSN="$(erl -noshell -eval "{ok, RelConf} = file:consult(\"$REL_CONFIG\"), {relea
 SYS_CONFIG=$KASTLE_HOME/releases/$VSN/sys.config
 
 SYS_CONFIG_SRC=/etc/kastle/sys.config
-if [ ! -f $SYS_CONFIG_SRC ]; then
-  SYS_CONFIG_SRC=$THIS_DIR/../rel/sys.config.example
-fi
 
-## copy a sys.config file if it is not found in release dir
-if [ ! -f $SYS_CONFIG ]; then
+## use /etc/kastle/sys.config if exist
+if [ -f $SYS_CONFIG ]; then
   cp $SYS_CONFIG_SRC $SYS_CONFIG
 fi
 
