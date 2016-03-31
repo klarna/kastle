@@ -80,6 +80,8 @@ maybe_update_env() ->
       ok = maybe_set_kastle_param(?KASTLE_SSL_FAIL_IF_NO_PEER_CERT, ssl,
                                   fail_if_no_peer_cert, ?l2a);
     {ok, false} ->
+      ok;
+    undefined ->
       ok
   end,
   ok.
@@ -94,7 +96,10 @@ maybe_set_kastle_param(EnvVarName, Section, Param, ConvertFun) ->
 set_kastle_env(root, Param, Value) ->
   application:set_env(?APPLICATION, Param, Value);
 set_kastle_env(Section, Param, Value) ->
-  {ok, SectionConfig0} = application:get_env(kastle, Section),
+  SectionConfig0 = case application:get_env(kastle, Section) of
+                     {ok, Cfg} -> Cfg;
+                     undefined -> []
+                   end,
   SectionConfig = lists:keystore(Param, 1, SectionConfig0, {Param, Value}),
   application:set_env(?APPLICATION, Section, SectionConfig).
 
