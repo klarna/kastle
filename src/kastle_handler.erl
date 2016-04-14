@@ -159,10 +159,11 @@ should_log_or_trace(Level) ->
   (lager_util:level_to_num(Level) band CurrentLevel) /= 0 orelse Traces /= [].
 
 get_server_log_fmt_fun(ExtraFmt) ->
-  fun() -> "~s ~s ~s ~B, user-agent: ~s, host: ~s, content-type: ~s, content-length: ~s, " ++ ExtraFmt end.
+  fun() -> "~s ~s ~s ~s ~B, user-agent: ~s, host: ~s, content-type: ~s, content-length: ~s, " ++ ExtraFmt end.
 
 get_server_log_fmt_args_fun(Req, ResponseCode, ExtraArgs) ->
   fun() ->
+      {Peer, _} = cowboy_req:peer(Req),
       {Method, _} = cowboy_req:method(Req),
       {Path, _} = cowboy_req:path(Req),
       {Version, _} = cowboy_req:version(Req),
@@ -170,8 +171,11 @@ get_server_log_fmt_args_fun(Req, ResponseCode, ExtraArgs) ->
       {Host, _} = cowboy_req:header(<<"host">>, Req),
       {ContentType, _} = cowboy_req:header(<<"content-type">>, Req),
       {ContentLength, _} = cowboy_req:header(<<"content-length">>, Req),
-      [Method, Path, Version, ResponseCode, UserAgent, Host, ContentType, ContentLength] ++ ExtraArgs
+      [peer_to_str(Peer), Method, Path, Version, ResponseCode, UserAgent, Host, ContentType, ContentLength] ++ ExtraArgs
   end.
+
+peer_to_str({IP, _Port}) when is_tuple(IP) -> inet:ntoa(IP);
+peer_to_str(_Other)                        -> "undefined".
 
 parse_partition(Partition) when is_binary(Partition) ->
   string:to_integer(binary_to_list(Partition));
