@@ -1,4 +1,6 @@
 # Kastle - Kafka REST proxy
+Kastle is a REST interface to Kafka cluster for producers, powered by [Brod](https://github.com/klarna/brod), [Cowboy](https://github.com/ninenines/cowboy) and [Erlang VM](http://www.erlang.org/).
+
 Kastle can handle both HTTP and HTTPS requests and supports mutual TLS authentication.
 
 It can run behind proxy (e.g. nginx) but it's not a must, erlang vm handles concurrent connections and slow clients rather well.
@@ -8,16 +10,16 @@ It can run behind proxy (e.g. nginx) but it's not a must, erlang vm handles conc
     make
     make run
 
-By default kastle node will listen on port 8092.
+By default kastle node will listen on 8092 for http and on 8093 (if configured) for https requests.
 
 ## Post messages to Kafka
-Produce a message to a random partition of a specified topic. Recommended way of producing data if the topic is not compacted and the order of the events is not important.
+Produce a message to a random partition of a specified topic:
 
-    POST <endpoint>/rest/kafka/v0/{topic}
+    POST <endpoint>/rest/kafka/v0/<topic>
 
 Produces a message to a specified partition of a specified topic.
 
-    POST <endpoint>/rest/kafka/v0/{topic}/{partition}
+    POST <endpoint>/rest/kafka/v0/<topic>/<partition>
 
 ## HTTP headers/body
 Request body structure depends on headers.
