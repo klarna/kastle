@@ -75,7 +75,7 @@ Example:
 * Dockerfile is included
 * All (well, most of them) config variables can be overriden via env variables
 
-Build and RPM:
+Build Kastle rpm package:
 
     make rpm
 
