@@ -45,6 +45,7 @@ The whole POST request body will be taken by kastle as a binary blob and produce
 On success, the HTTP status code in the response header is 204 No Content.
 
 On client error, we return a JSON error object, if applicable, and the HTTP status as one of the following:
+
 * 400 Bad Request if invalid JSON
 * 400 Bad Content-Type header value, if non compliant Content-Type header
 * 404 Not Found if unidentified topic or partition
