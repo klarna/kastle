@@ -1,6 +1,6 @@
 FROM erlang:latest
 
-MAINTAINER TheSyndicate <thesyndicate.e@klarna.com>
+MAINTAINER Shi Zaiming <shi.zaiming@klarna.com>, Ivan Dyachkov <ivan.dyachkov@klarna.com>
 
 RUN mkdir /kastle
 WORKDIR /kastle
@@ -14,7 +14,7 @@ RUN make
 
 EXPOSE 8092
 
-## Mount /etc/kastel/sys.config to override the default sys.config
+## Mount /etc/kastle/sys.config to override the default sys.config
 
 CMD ["/kastle/scripts/kastle-daemon.sh", "console"]
 
