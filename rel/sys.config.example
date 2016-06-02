@@ -17,19 +17,20 @@
 , { kastle, [ {http, [ {port, 8092}
                      , {listeners, 4}
                      ]}
-            , {ssl_enabled, false}
+            , {ssl_enabled, true}
             , {ssl, [ {port, 8093}
-                    , {certfile, "/etc/ssl/certs/localhost.crt"}
-                    , {cacertfile, "/etc/ssl/certs/ca-bundle.crt"}
-                    , {keyfile, "/etc/pki/tls/private/localhost.key"}
+                    , {listeners, 4}
+                    , {cacertfile, {priv, "ssl/ca.crt"}} % or abs path
+                    , {certfile, {priv, "ssl/server.crt"}} % or abs path
+                    , {keyfile, {priv, "ssl/server.key"}} % or abs path
                     , {versions, ['tlsv1.2', 'tlsv1.1', 'tlsv1']}
                     %, {ciphers, [ "AES256-SHA256" ]}
                     , {secure_renegotiate, true}
                     , {reuse_sessions, true}
                     , {honor_cipher_order, true}
                     , {max_connections, infinity}
-                    %, {verify, verify_peer}
-                    %, {fail_if_no_peer_cert, true}
+                    , {verify, verify_peer}
+                    , {fail_if_no_peer_cert, true}
                     ]}
             , {kafka_endpoints, [{"localhost", 9092}]}
             , {brod_client_config, [ {restart_delay_seconds, 10}

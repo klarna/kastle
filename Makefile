@@ -8,6 +8,7 @@ DEPS = brod cowboy lager jiffy jesse
 TEST_DEPS = meck
 
 dep_brod_commit = 2.1.2
+dep_cowboy_commit = 1.0.4
 
 rel:: rel/sys.config
 
