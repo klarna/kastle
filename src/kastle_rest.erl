@@ -121,13 +121,27 @@ start_http(Protocol) ->
 maybe_start_https(false, _Protocol) ->
   null;
 maybe_start_https(true, Protocol) ->
-  SslConfig = kastle:getenv(ssl),
+  SslConfig0 = kastle:getenv(ssl),
+  SslConfig = resolve_file_paths(SslConfig0),
   Port = proplists:get_value(port, SslConfig),
   Acceptors = proplists:get_value(acceptors, SslConfig, ?DEFAULT_ACCEPTORS),
   Listener = make_ref(),
   lager:info("~p HTTPS listener is using port ~p", [?APPLICATION, Port]),
   {ok, _} = cowboy:start_https(Listener, Acceptors, SslConfig, Protocol),
   Listener.
+
+resolve_file_paths([]) -> [];
+resolve_file_paths([{Tag, File} | Rest]) when Tag =:= certfile orelse
+                                              Tag =:= cacertfile orelse
+                                              Tag =:= keyfile ->
+  [{Tag, resolve_file_path(File)} | resolve_file_paths(Rest)];
+resolve_file_paths([Other | Rest]) ->
+  [Other | resolve_file_paths(Rest)].
+
+resolve_file_path({priv, Path}) ->
+  filename:join(code:priv_dir(?APPLICATION), Path);
+resolve_file_path(Path) when is_list(Path) ->
+  Path.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

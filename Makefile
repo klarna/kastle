@@ -1,13 +1,14 @@
 PROJECT = kastle
 PROJECT_DESCRIPTION = Apache Kafka REST Proxy
-PROJECT_VERSION = 1.1.0
+PROJECT_VERSION = 1.2.0
 
 # Whitespace to be used when creating files from templates.
 SP = 2
 DEPS = brod cowboy lager jiffy jesse
 TEST_DEPS = meck
 
-dep_brod = git https://github.com/klarna/brod.git 2.0-dev
+dep_brod_commit = 2.1.2
+dep_cowboy_commit = 1.0.4
 
 rel:: rel/sys.config
 

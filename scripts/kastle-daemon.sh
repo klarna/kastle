@@ -20,7 +20,7 @@ SYS_CONFIG=$KASTLE_HOME/releases/$VSN/sys.config
 SYS_CONFIG_SRC=/etc/kastle/sys.config
 
 ## use /etc/kastle/sys.config if exist
-if [ -f $SYS_CONFIG ]; then
+if [ -f $SYS_CONFIG_SRC ]; then
   cp $SYS_CONFIG_SRC $SYS_CONFIG
 fi
 
