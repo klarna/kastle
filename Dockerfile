@@ -6,6 +6,7 @@ RUN mkdir /kastle
 WORKDIR /kastle
 ADD rel ./rel
 ADD src ./src
+ADD priv ./priv
 ADD erlang.mk ./erlang.mk
 ADD Makefile ./Makefile
 ADD relx.config ./relx.config
