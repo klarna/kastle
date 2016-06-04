@@ -5,14 +5,39 @@ Kastle can handle both HTTP and HTTPS requests and supports mutual TLS authentic
 
 It can run behind proxy (e.g. nginx) but it's not a must, erlang vm handles concurrent connections and slow clients rather well.
 
-## Getting started
+## Quick demo
+
+* Build Kastle (require Erlang/OTP 18.0, or later)
 
     make
-    make run
 
-By default kastle node will listen on 8092 for http and on 8093 (if configured) for https requests.
+* Start Kastle (require Docker-compose)
 
-## Post messages to Kafka
+    make test-env
+
+* Start Kastle (connect to your running kafka cluster)
+
+    Edit `kafka_endpoints` etc. in `rel/sys.config` to point your kafka cluster, and run Kastle by `make run`
+
+* cURL examples (by default kastle listens on port 8092 for http and 8093 for https requests)
+
+```bash
+curl -v -X POST -H "Content-type: application/binary" \
+                -H "Kafka-Key:the-key" \
+                --data "the-value" \
+                http://localhost:8092/rest/kafka/v0/test-topic/0
+
+curl -v -X POST -H "Content-type: application/binary" \
+                -H "Kafka-Key:the-key" \
+                --data "the-value" \
+                --key priv/ssl/client.key \
+                --cert priv/ssl/client.crt \
+                --cacert priv/ssl/ca.crt \
+                https://localhost:8093/rest/kafka/v0/test-topic/0
+```
+
+## Http request specs
+
 Produce a message to a random partition of a specified topic:
 
     POST <endpoint>/rest/kafka/v0/<topic>
@@ -21,10 +46,11 @@ Produces a message to a specified partition of a specified topic.
 
     POST <endpoint>/rest/kafka/v0/<topic>/<partition>
 
-## HTTP headers/body
+### HTTP headers/body
+
 Request body structure depends on headers.
 
-### HTTP headers option #1
+#### HTTP headers option #1
 
     Content-Type: application/json
 
@@ -33,7 +59,7 @@ Request body should be a JSON object with 2 mandatory fields:
     key:   User defined key for the producing message
     value: Message value which will be produced to the topic of user choice yes
 
-### HTTP headers option #2
+#### HTTP headers option #2
 
     Content-Type: application/binary
     Kafka-Key: <kafka-key-value>
@@ -42,6 +68,7 @@ Kafka-Key is an optional header, but if present its value is used as a key for k
 The whole POST request body will be taken by kastle as a binary blob and produce as kafka-value to kafka.
 
 ## Response status codes
+
 On success, the HTTP status code in the response header is 204 No Content.
 
 On client error, we return a JSON error object, if applicable, and the HTTP status as one of the following:
@@ -70,7 +97,8 @@ Example:
 
     GET <endpoint>/ping
 
-## Kastle is DevOps friendly
+## Kastle is Ops friendly
+
 * RPM spec is included
 * Dockerfile is included
 * All (well, most of them) config variables can be overriden via env variables
@@ -105,3 +133,29 @@ Just replace company.com and s3 bucket/folder with your names.
 
 One can also set KASTLE_SSL_CIPHERS variable to comma-separated list of preferred cipher suites.
 
+## Example of httpc to access kastle https endpoint
+
+```erlang
+1> SSLOpts =[{verify,verify_peer},{certfile,"priv/ssl/client.crt"},{keyfile, "priv/ssl/client.key"},{cacertfile,"priv/ssl/ca.crt"}].
+[{verify,verify_peer},
+ {certfile,"priv/ssl/client.crt"},
+ {keyfile,"priv/ssl/client.key"},
+ {cacertfile,"priv/ssl/ca.crt"}]
+2> URL="https://localhost:8093/rest/kafka/v0/test-topic/0".
+"https://localhost:8093/rest/kafka/v0/test-topic/0"
+3> ContentType = "application/binary".
+"application/binary"
+4> Headers = [{"Kafka-Key", "the-key"}].
+[{"Kafka-Key","the-key"}]
+5> application:ensure_all_started(ssl).
+{ok,[crypto,asn1,public_key,ssl]}
+6> application:start(inets).
+ok
+7> httpc:request(post, {URL, Headers, ContentType, <<"the value">>}, [{ssl, SSLOpts}], []).
+{ok,{{"HTTP/1.1",204,"No Content"},
+     [{"date","Fri, 03 Jun 2016 08:40:45 GMT"},
+      {"server","Cowboy"},
+      {"content-length","0"},
+      {"content-type","application/json; charset=utf-8"}],
+     []}}
+```
