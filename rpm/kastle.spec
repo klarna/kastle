@@ -42,10 +42,10 @@ main(_) ->
   LagerConfig0 = proplists:get_value(lager, Config0, []),
   LagerConfig1 = lists:keystore(log_root, 1, LagerConfig0, {log_root, "%{_log_dir}"}),
   LagerConsoleBackend = {lager_console_backend,error},
-  LagerFileBackend = {lager_file_backend,[ {file, "error.log"}
-                                         , {level, error}
+  LagerFileBackend = {lager_file_backend,[ {file, "info.log"}
+                                         , {level, info}
                                          , {size, 10485760}
-                                         , {date, "$W0D23"}
+                                         , {date, "\$W0D23"}
                                          , {count, 5}]},
   Handlers = [LagerConsoleBackend, LagerFileBackend],
   LagerConfig = lists:keystore(handlers, 1, LagerConfig1, {handlers, Handlers}),
