@@ -1,6 +1,6 @@
 PROJECT = kastle
 PROJECT_DESCRIPTION = Apache Kafka REST Proxy
-PROJECT_VERSION = 1.2.0
+PROJECT_VERSION = 1.2.1
 
 # Whitespace to be used when creating files from templates.
 SP = 2
