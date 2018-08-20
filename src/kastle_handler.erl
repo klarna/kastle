@@ -48,6 +48,7 @@
 -define(PARTITION_REQ, partition).
 
 -define(KAFKA_KEY_HEADER, <<"kafka-key">>).
+-define(KAFKA_KEY_ENCODING_HEADER, <<"kafka-key-encoding">>).
 
 -type key() :: binary().
 -type value() :: binary().
@@ -120,18 +121,21 @@ handle_binary(Req0, State) ->
   {Topic, Req1} = cowboy_req:binding(?TOPIC_REQ, Req0),
   {Partition, Req2} = cowboy_req:binding(?PARTITION_REQ, Req1),
   {Key, Req3} = cowboy_req:header(?KAFKA_KEY_HEADER, Req2, <<>>),
-  {ok, Value, Req4} = cowboy_req:body(Req3),
+  {KeyEncoding, Req4} = cowboy_req:header(?KAFKA_KEY_ENCODING_HEADER, Req3, <<>>),
+
+  {ok, Value, Req5} = cowboy_req:body(Req4),
   {ok, Req} =
-    case do_handle_binary(Topic, parse_partition(Partition), Key, Value) of
+    case do_handle_binary(Topic, parse_partition(Partition),
+                          handle_key_encoding(cowboy_bstr:to_lower(KeyEncoding), Key), Value) of
       ok ->
-        server_log(info, Req4, 204),
-        cowboy_req:reply(204, Req4);
+        server_log(info, Req5, 204),
+        cowboy_req:reply(204, Req5);
       {error, Error} ->
-        server_log(error, Req4, 400, "error: ~p", [Error]),
-        cowboy_req:reply(400, [], jiffy:encode(#{error => Error}), Req4);
+        server_log(error, Req5, 400, "error: ~p", [Error]),
+        cowboy_req:reply(400, [], jiffy:encode(#{error => Error}), Req5);
       {error, Code, Error} ->
-        server_log(error, Req4, Code, "error: ~p", [Error]),
-        cowboy_req:reply(Code, [], jiffy:encode(#{error => Error}), Req4)
+        server_log(error, Req5, Code, "error: ~p", [Error]),
+        cowboy_req:reply(Code, [], jiffy:encode(#{error => Error}), Req5)
     end,
   {halt, Req, State}.
 
@@ -220,6 +224,8 @@ do_handle_json(Topic, {Partition, []}, {ok, Data}) when is_integer(Partition) ->
   Value = maps:get(?MESSAGE_VALUE, Data),
   produce(Topic, Partition, Key, Value).
 
+do_handle_binary(_Topic, _Partition, {error, invalid_encoding}, _Value) ->
+  {error, <<"invalid key encoding">>};
 do_handle_binary(Topic, undefined, Key, Value) ->
   produce_to_random_partition(Topic, Key, Value);
 do_handle_binary(_Topic, {error, no_integer}, _Key, _Value) ->
@@ -286,6 +292,10 @@ gen_random_list(Min, Max) ->
   L0 = [{crypto:rand_uniform(0,1 bsl 32), X} || X <- lists:seq(Min, Max)],
   {_, L} = lists:unzip(lists:keysort(1, L0)),
   L.
+
+handle_key_encoding(<<"base64">>, Key) -> base64:decode(Key);
+handle_key_encoding(<<>>, Key) -> Key;
+handle_key_encoding(_Encoding, _Key) -> {error, invalid_encoding}.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
