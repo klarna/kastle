@@ -1,3 +1,9 @@
+# **THIS PROJECT IS NO LONGER MAINTAINED!**
+
+This is an archived, read-only repository. Klarna is no longer using
+Kastle, and after 3 years of inactivity the decision has been made to
+also stop maintaining the project.
+
 # Kastle - Kafka REST proxy
 Kastle is a REST interface to Kafka cluster for producers, powered by [Brod](https://github.com/klarna/brod), [Cowboy](https://github.com/ninenines/cowboy) and [Erlang VM](http://www.erlang.org/).
 
